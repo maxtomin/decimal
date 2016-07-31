@@ -1,6 +1,18 @@
 package org.maxtomin.decimal;
 
 public class BaseDecimal {
+    static final int[] POW10 = {
+            1,
+            10,
+            100,
+            1000,
+            10000,
+            100000,
+            1000000,
+            10000000,
+            100000000,
+            1000000000,
+    };
     static final int WORD_BITS = 32;
     static final long WORD_CARRY = 1L << WORD_BITS;
     static final long WORD_LO_MASK = WORD_CARRY - 1;
@@ -9,6 +21,10 @@ public class BaseDecimal {
 
     long getA() {
         return a;
+    }
+
+    void setA(long a) {
+        this.a = a;
     }
 
     long mulhi_63_32(long a_63, long b_32) {
@@ -101,17 +117,64 @@ public class BaseDecimal {
         long a_31 = hi_32(a_63);
         long a_32 = lo_32(a_63);
 
-        long p = a_32 * lo_32(b_63); // lo parts
-        long p_32 = lo_32(p);
-        long p_63o = hi_32(p);
+        if (scale <= 9) {
+            long p = a_32 * lo_32(b_63); // lo parts
+            long p_32 = lo_32(p);
+            long p_63o = hi_32(p);
 
-        // we don't care about overflow to word 3 there:
-        p_63o += a_32 * hi_32(b_63);
-        p_63o += a_31 * b_63;
+            // we don't care about overflow to word 3 there:
+            p_63o += a_32 * hi_32(b_63);
+            p_63o += a_31 * b_63;
 
-        // long division: words 2,1,0 by int POW10[scale]
-        long result_63o = downScale_63_31(p_63o, scale);
-        return (result_63o << WORD_BITS) + downScale_63_31((a << WORD_BITS) | p_32, scale);
+            // long division: words 2,1,0 by int POW10[scale]
+            long result_63o = downScale_63_31(p_63o, scale);
+            return (result_63o << WORD_BITS) + downScale_63_31((a << WORD_BITS) | p_32, scale);
+        }
+
+        // big scale - more complicated
+        scale -= 10;
+
+        // first, we have to do full 4-way multiplication (we need 2 bits from word 3, so can't ignore it)
+        long b_31 = hi_32(b_63);
+        long b_32 = lo_32(b_63);
+        long lo_64 = a_32 * b_32;
+        long p_64 = a_32 * b_31 + a_31 * b_32; // possible overflow to sign
+        long p_63 = a_31 * b_31;
+        // move everything from lo to p (mind the overflows!)
+        p_63 += hi_32(p_64);
+        p_64 = lo_32(p_64) + hi_32(lo_64);
+        p_63 += hi_32(p_64);
+        p_64 = (p_64 << WORD_BITS) | lo_32(lo_64);
+
+        // now we need to long-divide twice, first by 10^10 then by 10^scale
+        // the formula for final remainder derived from:
+        // v / d1 / d2 = (q1 + r1 / d1) / d2 = q1 / d2 + r1 / d1d2 = q2 + r2 / d2 + r1 / d1d2 = q2 + (r2d1 + r1) / d1d2
+
+        // p >>>= 3 [note: lowest 3 bits are still saved in lo_64]
+        p_64 = (p_64 >>> 3) | (p_63 << 61);
+        p_63 >>>= 3;
+
+        // (p >>> 2) / (10^10 >>> 2) [note: this is NOT approximate, we just thrown away 2 zeros in denominator]
+        long q1_63 = p_63 / 1250000000;
+        long r_33 = p_63 % 1250000000;
+
+        p_63 = (r_33 << WORD_BITS) | hi_32(p_64);
+        long q2_32 = p_63 / 1250000000;
+        r_33 = p_63 % 1250000000;
+
+        p_63 = (r_33 << WORD_BITS) | lo_32(p_64);
+        long q3_32 = p_63 / 1250000000;
+        r_33 = p_63 % 1250000000;
+        // restoring 3 lowest bits of the remainder:
+        r_33 = (r_33 << 3) + (lo_64 & 0x7);
+
+        // second division: by scale
+        downScale_63_31(q1_63, scale); // ignore high word (overflow)
+        long qh_32 = downScale_63_31((a << WORD_BITS) | q2_32, scale);
+        long ql_32 = downScale_63_31((a << WORD_BITS) | q3_32, scale);
+
+        a = a * 10000000000L + r_33; // final remainder
+        return (qh_32 << WORD_BITS) | ql_32; // final quotient (overflow possible)
     }
 
     long downScale_63_31(long v_63, int scale) {
@@ -170,3 +233,4 @@ public class BaseDecimal {
         System.out.println(Long.toHexString((Long.MAX_VALUE - 1) / (Integer.MAX_VALUE / 2 + 1)));
     }
 }
+
