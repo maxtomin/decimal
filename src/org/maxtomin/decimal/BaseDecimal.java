@@ -1,5 +1,7 @@
 package org.maxtomin.decimal;
 
+import java.math.RoundingMode;
+
 public class BaseDecimal {
     static final int[] POW10 = {
             1,
@@ -212,6 +214,45 @@ public class BaseDecimal {
                 return v_63 / 1000000000;
             default:
                 throw new IllegalArgumentException("Incorrect scale: " + scale);
+        }
+    }
+
+
+    /**
+     * Round common (and mixed) fractions
+     */
+    protected static long round(long whole, long numerator, long denominator, RoundingMode roundingMode) {
+        switch (roundingMode) {
+            case UNNECESSARY: // 7
+                if (numerator != 0) {
+                    throw new IllegalArgumentException("Rounding required, result = " + whole + " " + Math.abs(numerator) + "/" + denominator);
+                }
+                return whole;
+            case HALF_EVEN: // 6
+                denominator -= whole & 0x1; // HALF_UP for odd, making denominator < numerator * 2, else HALF_DOWN
+                // fall through
+            case HALF_DOWN: // 5
+                numerator *= 2;
+                if (numerator <= denominator && numerator >= -denominator) {
+                    numerator = 0; // go DOWN
+                }
+                return whole + Long.signum(numerator);
+            case HALF_UP: // 4
+                numerator *= 2;
+                if (numerator < denominator && numerator > -denominator) {
+                    numerator = 0; // go DOWN
+                }
+                return whole + Long.signum(numerator);
+            case FLOOR: // 3
+                return whole + (numerator >> 63); // decrement if negative
+            case CEILING: // 2
+                return whole - (-numerator >> 63); // increment if positive
+            case DOWN: // 1
+                return whole;
+            case UP: // 0
+                return whole + Long.signum(numerator);
+            default:
+                throw new IllegalArgumentException("Unknown rounding mode: " + roundingMode);
         }
     }
 

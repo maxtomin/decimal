@@ -2,9 +2,13 @@ package org.maxtomin.decimal;
 
 import org.junit.Test;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 
+import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 public class BaseDecimalTest {
@@ -96,6 +100,45 @@ public class BaseDecimalTest {
         testMulScale(9223372032559808512L, 9223372036854775807L, 18);
         testMulScale(9223372032559808512L, 9223372036854775807L, 18);
         testMulScale(9223372036854775807L, 8446744073709551615L, 18);
+    }
+
+    @Test
+    public void testRound() throws Exception {
+        for (int whole = 0; whole <= 9; whole++) {
+            for (int num = 0; num <= 9; num++) {
+                for (RoundingMode mode : RoundingMode.values()) {
+                    if (mode != RoundingMode.UNNECESSARY) {
+                        assertThat(whole + " " + num + "/10 " + mode,
+                                BaseDecimal.round(whole, num, 10, mode),
+                                is(BigDecimal.valueOf(whole * 10 + num).divide(BigDecimal.TEN, mode).longValue()));
+                        assertThat("-" + whole + " " + num + "/10 " + mode,
+                                BaseDecimal.round(-whole, -num, 10, mode),
+                                is(BigDecimal.valueOf(-whole * 10 - num).divide(BigDecimal.TEN, mode).longValue()));
+                    }
+                }
+            }
+        }
+
+        // some overflows
+        assertThat(BaseDecimal.round(0, Long.MAX_VALUE - 1, Long.MAX_VALUE, RoundingMode.DOWN), is(0L));
+        assertThat(BaseDecimal.round(0, Long.MAX_VALUE - 1, Long.MAX_VALUE, RoundingMode.UP), is(1L));
+        assertThat(BaseDecimal.round(0, Long.MAX_VALUE - 1, Long.MAX_VALUE, RoundingMode.FLOOR), is(0L));
+        assertThat(BaseDecimal.round(0, Long.MAX_VALUE - 1, Long.MAX_VALUE, RoundingMode.CEILING), is(1L));
+
+        assertThat(BaseDecimal.round(0, -Long.MAX_VALUE + 1, Long.MAX_VALUE, RoundingMode.DOWN), is(0L));
+        assertThat(BaseDecimal.round(0, -Long.MAX_VALUE + 1, Long.MAX_VALUE, RoundingMode.UP), is(-1L));
+        assertThat(BaseDecimal.round(0, -Long.MAX_VALUE + 1, Long.MAX_VALUE, RoundingMode.FLOOR), is(-1L));
+        assertThat(BaseDecimal.round(0, -Long.MAX_VALUE + 1, Long.MAX_VALUE, RoundingMode.CEILING), is(0L));
+
+        assertThat(BaseDecimal.round(0, Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_DOWN), is(0L));
+        assertThat(BaseDecimal.round(0, Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_UP), is(1L));
+        assertThat(BaseDecimal.round(0, Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_EVEN), is(0L));
+        assertThat(BaseDecimal.round(1, Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_EVEN), is(2L));
+
+        assertThat(BaseDecimal.round(0, -Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_DOWN), is(0L));
+        assertThat(BaseDecimal.round(0, -Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_UP), is(-1L));
+        assertThat(BaseDecimal.round(0, -Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_EVEN), is(0L));
+        assertThat(BaseDecimal.round(-1, -Long.MAX_VALUE / 2, Long.MAX_VALUE - 1, RoundingMode.HALF_EVEN), is(-2L));
     }
 
     private void testMulScale(long a, long b, int scale) {
