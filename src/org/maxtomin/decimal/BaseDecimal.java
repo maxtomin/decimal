@@ -25,7 +25,7 @@ public class BaseDecimal {
         return a;
     }
 
-    void setA(long a) {
+    void setRaw(long a) {
         this.a = a;
     }
 
@@ -37,6 +37,20 @@ public class BaseDecimal {
 
         a = lo_32(rLo_64);
         return rHi_63;
+    }
+
+    long mulDivRound(long v, int m, long d, RoundingMode roundingMode) {
+        long sign1 = v >> 63;
+        long sign2 = d >> 63;
+
+        v = negIf(v, sign1); // ~v - 1 if negative
+        d = negIf(d, sign2);
+
+        long result = muldiv_63o_63(v, m, d);
+
+        sign1 ^= sign2;
+
+        return round(negIf(result, sign1), negIf(a, sign1), d, roundingMode);
     }
 
     long muldiv_63o_63(long v_63, int m_31, long d_63) {
@@ -115,6 +129,20 @@ public class BaseDecimal {
         return offset_63o + qhat_32;
     }
 
+    long mulScaleRound(long v, long m, int scale, RoundingMode roundingMode) {
+        long sign1 = v >> 63;
+        long sign2 = m >> 63;
+
+        v = negIf(v, sign1);
+        m = negIf(m, sign2);
+
+        long result = mulscale_63o_31(v, m, scale);
+
+        sign1 ^= sign2;
+
+        return round(negIf(result, sign1), negIf(a, sign1), POW10[scale], roundingMode);
+    }
+
     long mulscale_63o_31(long a_63, long b_63, int scale) {
         long a_31 = hi_32(a_63);
         long a_32 = lo_32(a_63);
@@ -181,6 +209,7 @@ public class BaseDecimal {
 
     long downScale_63_31(long v_63, int scale) {
         // switch + division by constant is faster than "v_63 / PO10[scale]"
+        // also good for signed numbers (remainder is negative for negative result)
         switch (scale) {
             case 0:
                 a = 0;
@@ -232,17 +261,13 @@ public class BaseDecimal {
                 denominator -= whole & 0x1; // HALF_UP for odd, making denominator < numerator * 2, else HALF_DOWN
                 // fall through
             case HALF_DOWN: // 5
-                numerator *= 2;
-                if (numerator <= denominator && numerator >= -denominator) {
-                    numerator = 0; // go DOWN
-                }
-                return whole + Long.signum(numerator);
+                denominator >>>= 1;
+                return numerator <= denominator && numerator >= -denominator ? whole :
+                    whole + Long.signum(numerator);
             case HALF_UP: // 4
-                numerator *= 2;
-                if (numerator < denominator && numerator > -denominator) {
-                    numerator = 0; // go DOWN
-                }
-                return whole + Long.signum(numerator);
+                denominator >>>= 1;
+                return numerator < denominator && numerator > -denominator ? whole :
+                    whole + Long.signum(numerator);
             case FLOOR: // 3
                 return whole + (numerator >> 63); // decrement if negative
             case CEILING: // 2
@@ -266,6 +291,29 @@ public class BaseDecimal {
 
     private static long lo_32(long v_64) {
         return v_64 & WORD_LO_MASK;
+    }
+
+    private static long negIf(long v, long sign) {
+        return v ^ sign + sign; // if sign == -1, then return ~v - 1 == -v
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        BaseDecimal that = (BaseDecimal) o;
+
+        return a == that.a;
+    }
+
+    @Override
+    public int hashCode() {
+        return (int) (a ^ (a >>> 32));
     }
 
     public static void main(String[] args) {

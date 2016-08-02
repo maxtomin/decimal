@@ -213,17 +213,13 @@ public class BaseDecimalTest {
                 continue;
             }
             System.out.println(i);
-            for (int j = 0; j < 256; j++) {
-                long m = replaceBitsWithF(j);
-                if (m < 0 || m > Integer.MAX_VALUE) {
-                    continue;
-                }
+            for (int j = 0; j <= 18; j++) {
                 for (int k = 0; k < 65536; k++) {
                     long d = replaceBitsWithF(k);
                     if (d <= 0) {
                         continue;
                     }
-                    test.testMulDiv(v, (int) m, d);
+                    test.testMulScale(v, d, j);
                 }
             }
         }
