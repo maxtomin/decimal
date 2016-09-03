@@ -261,11 +261,11 @@ public class BaseDecimal {
                 denominator -= whole & 0x1; // HALF_UP for odd, making denominator < numerator * 2, else HALF_DOWN
                 // fall through
             case HALF_DOWN: // 5
-                denominator >>>= 1;
+                denominator /= 2;
                 return numerator <= denominator && numerator >= -denominator ? whole :
                     whole + Long.signum(numerator);
             case HALF_UP: // 4
-                denominator >>>= 1;
+                denominator /= 2;
                 return numerator < denominator && numerator > -denominator ? whole :
                     whole + Long.signum(numerator);
             case FLOOR: // 3

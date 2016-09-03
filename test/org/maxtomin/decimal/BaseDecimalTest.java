@@ -204,25 +204,25 @@ public class BaseDecimalTest {
         return result;
     }
 
-    public static void main(String[] args) {
-        // bulk test testMulDiv
-        BaseDecimalTest test = new BaseDecimalTest();
-        for (int i = 0; i < 65536; i++) {
-            long v = replaceBitsWithF(i);
-            if (v < 0) {
-                continue;
-            }
-            System.out.println(i);
-            for (int j = 0; j <= 18; j++) {
-                for (int k = 0; k < 65536; k++) {
-                    long d = replaceBitsWithF(k);
-                    if (d <= 0) {
-                        continue;
-                    }
-                    test.testMulScale(v, d, j);
-                }
-            }
-        }
-    }
+//    public static void main(String[] args) {
+//        // bulk test testMulDiv
+//        BaseDecimalTest test = new BaseDecimalTest();
+//        for (int i = 0; i < 65536; i++) {
+//            long v = replaceBitsWithF(i);
+//            if (v < 0) {
+//                continue;
+//            }
+//            System.out.println(i);
+//            for (int j = 0; j <= 18; j++) {
+//                for (int k = 0; k < 65536; k++) {
+//                    long d = replaceBitsWithF(k);
+//                    if (d <= 0) {
+//                        continue;
+//                    }
+//                    test.testMulScale(v, d, j);
+//                }
+//            }
+//        }
+//    }
 }
 
