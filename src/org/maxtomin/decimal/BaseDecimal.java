@@ -144,35 +144,39 @@ public class BaseDecimal {
     }
 
     long mulscale_63o_31(long a_63, long b_63, int scale) {
+        // long multiplication
         long a_31 = hi_32(a_63);
         long a_32 = lo_32(a_63);
+        long b_31 = hi_32(b_63);
+        long b_32 = lo_32(b_63);
+
+        long lo_64 = a_32 * b_32;
+        // no unsigned overflow: (2^31 - 1) * (2^32 - 1) * 2 + 2^32 = 18446744065119617026 < 2^64 =
+        //                                                          = 18446744073709551616
+        // may be signed overflow
+        long p_64 = a_32 * b_31 + a_31 * b_32 + hi_32(lo_64);
+        long p_63 = a_31 * b_31;
 
         if (scale <= 9) {
-            long p = a_32 * lo_32(b_63); // lo parts
-            long p_32 = lo_32(p);
-            long p_63o = hi_32(p);
+            if (p_63 < 0 || p_63 > Integer.MAX_VALUE) {
+                throw new ArithmeticException("Overflow");
+            }
 
-            // we don't care about overflow to word 3 there:
-            p_63o += a_32 * hi_32(b_63);
-            p_63o += a_31 * b_63;
+
+            // move everything to 3 words: p[63][32]
+            p_63 <<= WORD_BITS; // no high word in p_63
+            p_63 += p_64;
+            long p_32 = lo_32(lo_64);
 
             // long division: words 2,1,0 by int POW10[scale]
-            long result_63o = downScale_63_31(p_63o, scale);
+            long result_63o = downScale_63_31(p_63, scale);
             return (result_63o << WORD_BITS) + downScale_63_31((a << WORD_BITS) | p_32, scale);
         }
 
         // big scale - more complicated
         scale -= 10;
 
-        // first, we have to do full 4-way multiplication (we need 2 bits from word 3, so can't ignore it)
-        long b_31 = hi_32(b_63);
-        long b_32 = lo_32(b_63);
-        long lo_64 = a_32 * b_32;
-        long p_64 = a_32 * b_31 + a_31 * b_32; // possible overflow to sign
-        long p_63 = a_31 * b_31;
-        // move everything from lo to p (mind the overflows!)
-        p_63 += hi_32(p_64);
-        p_64 = lo_32(p_64) + hi_32(lo_64);
+        // move everything to 4 words p[63][64]
         p_63 += hi_32(p_64);
         p_64 = (p_64 << WORD_BITS) | lo_32(lo_64);
 
