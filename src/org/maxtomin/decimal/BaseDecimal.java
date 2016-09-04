@@ -18,7 +18,7 @@ public class BaseDecimal {
             1000000000,
     };
     static final long[] SCALE_OVERFLOW_LIMITS = {
-            Long.MAX_VALUE / 1,
+            Long.MAX_VALUE,
             Long.MAX_VALUE / 10,
             Long.MAX_VALUE / 100,
             Long.MAX_VALUE / 1000,
@@ -29,6 +29,29 @@ public class BaseDecimal {
             Long.MAX_VALUE / 100000000,
             Long.MAX_VALUE / 1000000000,
     };
+    static final char[][] ZEROES = {
+            "".toCharArray(),
+            "0".toCharArray(),
+            "00".toCharArray(),
+            "000".toCharArray(),
+            "0000".toCharArray(),
+            "00000".toCharArray(),
+            "000000".toCharArray(),
+            "0000000".toCharArray(),
+            "00000000".toCharArray(),
+            "000000000".toCharArray(),
+            "0000000000".toCharArray(),
+            "00000000000".toCharArray(),
+            "000000000000".toCharArray(),
+            "0000000000000".toCharArray(),
+            "00000000000000".toCharArray(),
+            "000000000000000".toCharArray(),
+            "0000000000000000".toCharArray(),
+            "00000000000000000".toCharArray(),
+            "000000000000000000".toCharArray(),
+            "0000000000000000000".toCharArray()
+    };
+
     static final int WORD_BITS = 32;
     static final long WORD_CARRY = 1L << WORD_BITS;
     static final long WORD_LO_MASK = WORD_CARRY - 1;
@@ -396,7 +419,7 @@ public class BaseDecimal {
     }
 
     static long negIf(long v, long sign) {
-        return v ^ sign + sign; // if sign == -1, then return ~v - 1 == -v
+        return (v ^ sign) - sign; // if sign == -1, then return ~v + 1 == -v
     }
 }
 

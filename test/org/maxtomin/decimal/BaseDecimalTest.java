@@ -10,6 +10,7 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
+import static org.maxtomin.decimal.AbstractDecimal.NaN;
 
 public class BaseDecimalTest {
     private final BaseDecimal decimal = new BaseDecimal();
@@ -48,6 +49,77 @@ public class BaseDecimalTest {
         testScaleDiv(449033535071450778L, 9, 659820219978L);
         testScaleDiv(0x400000000000L, 4, Long.MAX_VALUE);
         testScaleDiv(4026532095L, 4, 67553994662215680L);
+    }
+
+    @Test
+    public void testNegIf() throws Exception {
+        assertEquals(10, BaseDecimal.negIf(10, 0));
+        assertEquals(-10, BaseDecimal.negIf(-10, 0));
+        assertEquals(0, BaseDecimal.negIf(0, 0));
+
+        assertEquals(-10, BaseDecimal.negIf(10, -1));
+        assertEquals(10, BaseDecimal.negIf(-10, -1));
+        assertEquals(0, BaseDecimal.negIf(0, -1));
+    }
+
+    @Test
+    public void testScaleDivRound() throws Exception {
+        assertEquals(1, decimal.scaleDivRound(1, 0, 1, RoundingMode.UP));
+        assertEquals(-1, decimal.scaleDivRound(1, 0, -1, RoundingMode.UP));
+        assertEquals(-1, decimal.scaleDivRound(-1, 0, 1, RoundingMode.UP));
+        assertEquals(1, decimal.scaleDivRound(-1, 0, -1, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 0, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 0, -1, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(1, 0, NaN, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 0, NaN, RoundingMode.UP));
+
+        assertEquals(10, decimal.scaleDivRound(1, 1, 1, RoundingMode.UP));
+        assertEquals(-10, decimal.scaleDivRound(1, 1, -1, RoundingMode.UP));
+        assertEquals(-10, decimal.scaleDivRound(-1, 1, 1, RoundingMode.UP));
+        assertEquals(10, decimal.scaleDivRound(-1, 1, -1, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 1, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 1, -1, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(1, 1, NaN, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 1, NaN, RoundingMode.UP));
+
+        assertEquals(4, decimal.scaleDivRound(1, 1, 3, RoundingMode.UP));
+        assertEquals(-4, decimal.scaleDivRound(1, 1, -3, RoundingMode.UP));
+        assertEquals(-4, decimal.scaleDivRound(-1, 1, 3, RoundingMode.UP));
+        assertEquals(4, decimal.scaleDivRound(-1, 1, -3, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 1, 3, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 1, -3, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(1, 1, NaN, RoundingMode.UP));
+        assertEquals(NaN, decimal.scaleDivRound(NaN, 1, NaN, RoundingMode.UP));
+    }
+
+    @Test
+    public void testMulScaleRound() throws Exception {
+        assertEquals(123, decimal.mulScaleRound(123, 1, 0, RoundingMode.UP));
+        assertEquals(-123, decimal.mulScaleRound(123, -1, 0, RoundingMode.UP));
+        assertEquals(-123, decimal.mulScaleRound(-123, 1, 0, RoundingMode.UP));
+        assertEquals(123, decimal.mulScaleRound(-123, -1, 0, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(123, NaN, 0, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(-123, NaN, 0, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(NaN, 1, 0, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(NaN, NaN, 0, RoundingMode.UP));
+
+        assertEquals(13, decimal.mulScaleRound(123, 1, 1, RoundingMode.UP));
+        assertEquals(-13, decimal.mulScaleRound(123, -1, 1, RoundingMode.UP));
+        assertEquals(-13, decimal.mulScaleRound(-123, 1, 1, RoundingMode.UP));
+        assertEquals(13, decimal.mulScaleRound(-123, -1, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(123, NaN, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(-123, NaN, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(NaN, 1, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(NaN, NaN, 1, RoundingMode.UP));
+
+        assertEquals(13, decimal.mulScaleRound(1, 123, 1, RoundingMode.UP));
+        assertEquals(-13, decimal.mulScaleRound(-1, 123, 1, RoundingMode.UP));
+        assertEquals(-13, decimal.mulScaleRound(1, -123, 1, RoundingMode.UP));
+        assertEquals(13, decimal.mulScaleRound(-1, -123, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(NaN, 123, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(NaN, -123, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(1, NaN, 1, RoundingMode.UP));
+        assertEquals(NaN, decimal.mulScaleRound(NaN, NaN, 1, RoundingMode.UP));
     }
 
     @Test
@@ -148,7 +220,7 @@ public class BaseDecimalTest {
 
         long q = decimal.mulscale_63o_31(a, b, scale);
         long r = decimal.a;
-        if (q != AbstractDecimal.NaN) {
+        if (q != NaN) {
             assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));
             assertEquals("Remainder", dAndR[1], BigInteger.valueOf(r));
         } else {
@@ -163,7 +235,7 @@ public class BaseDecimalTest {
 
             long q = decimal.scalediv_63o_63(v, s, d);
             long r = decimal.a;
-            if (q != AbstractDecimal.NaN) {
+            if (q != NaN) {
                 assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));
                 assertEquals("Remainder", dAndR[1], BigInteger.valueOf(r));
             } else {
