@@ -3,6 +3,8 @@ package org.maxtomin.decimal;
 import java.math.RoundingMode;
 
 public class BaseDecimal {
+    public static final String OVERFLOW_EXCEPTION = "Overflow";
+
     static final int[] POW10 = {
             1,
             10,
@@ -157,58 +159,63 @@ public class BaseDecimal {
         long p_64 = a_32 * b_31 + a_31 * b_32 + hi_32(lo_64);
         long p_63 = a_31 * b_31;
 
-        if (scale <= 9) {
-            if (p_63 < 0 || p_63 > Integer.MAX_VALUE) {
-                throw new ArithmeticException("Overflow");
-            }
+        long p_32;
+        long r_33 = -1; // remainder from division by 10^10 (if necessary)
+        if (scale > 9) {
+            // move everything to 4 words p[63][64]
+            p_63 += hi_32(p_64);
+            p_64 = (p_64 << WORD_BITS) | lo_32(lo_64);
 
+            // now we need to long-divide by 10^10 first (and then - by 10^scale as usual)
+            // the formula for final remainder derived from:
+            // v / d1 / d2 = (q1 + r1 / d1) / d2 = q1 / d2 + r1 / d1d2 = q2 + r2 / d2 + r1 / d1d2 = q2 + (r2d1 + r1) / d1d2
+
+            // p >>>= 3 [note: lowest 3 bits are still saved in lo_64]
+            p_64 = (p_64 >>> 3) | (p_63 << 61);
+            p_63 >>>= 3;
+
+            // (p >>> 3) / (10^10 >>> 3) [note: this is NOT approximate, we just thrown away 3 zeros in denominator]
+            long q1_63 = p_63 / 1250000000;
+            r_33 = p_63 % 1250000000;
+
+            p_63 = (r_33 << WORD_BITS) | hi_32(p_64);
+            long q2_32 = p_63 / 1250000000;
+            r_33 = p_63 % 1250000000;
+
+            p_63 = (r_33 << WORD_BITS) | lo_32(p_64);
+            long q3_32 = p_63 / 1250000000;
+            r_33 = p_63 % 1250000000;
+            // restoring 3 lowest bits of the remainder:
+            r_33 = (r_33 << 3) + (lo_64 & 0x7);
+
+            assert q1_63 >= 0 && q1_63 <= Integer.MAX_VALUE : "we have just divided it by 10^10 > 2^32";
+            p_63 = (q1_63 << WORD_BITS) | q2_32;
+            p_32 = q3_32;
+
+            scale -= 10;
+        } else {
+            if (p_63 < 0 || p_63 > Integer.MAX_VALUE) {
+                throw new ArithmeticException(OVERFLOW_EXCEPTION);
+            }
 
             // move everything to 3 words: p[63][32]
             p_63 <<= WORD_BITS; // no high word in p_63
             p_63 += p_64;
-            long p_32 = lo_32(lo_64);
-
-            // long division: words 2,1,0 by int POW10[scale]
-            long result_63o = downScale_63_31(p_63, scale);
-            return (result_63o << WORD_BITS) + downScale_63_31((a << WORD_BITS) | p_32, scale);
+            p_32 = lo_32(lo_64);
         }
 
-        // big scale - more complicated
-        scale -= 10;
+        // long division: words 2,1,0 by int POW10[scale]
+        long result_63o = downScale_63_31(p_63, scale);
+        long ql_32 = downScale_63_31((a << WORD_BITS) | p_32, scale);
 
-        // move everything to 4 words p[63][64]
-        p_63 += hi_32(p_64);
-        p_64 = (p_64 << WORD_BITS) | lo_32(lo_64);
+        if (result_63o < 0 || result_63o > Integer.MAX_VALUE) {
+            throw new ArithmeticException(OVERFLOW_EXCEPTION);
+        }
 
-        // now we need to long-divide twice, first by 10^10 then by 10^scale
-        // the formula for final remainder derived from:
-        // v / d1 / d2 = (q1 + r1 / d1) / d2 = q1 / d2 + r1 / d1d2 = q2 + r2 / d2 + r1 / d1d2 = q2 + (r2d1 + r1) / d1d2
-
-        // p >>>= 3 [note: lowest 3 bits are still saved in lo_64]
-        p_64 = (p_64 >>> 3) | (p_63 << 61);
-        p_63 >>>= 3;
-
-        // (p >>> 2) / (10^10 >>> 2) [note: this is NOT approximate, we just thrown away 2 zeros in denominator]
-        long q1_63 = p_63 / 1250000000;
-        long r_33 = p_63 % 1250000000;
-
-        p_63 = (r_33 << WORD_BITS) | hi_32(p_64);
-        long q2_32 = p_63 / 1250000000;
-        r_33 = p_63 % 1250000000;
-
-        p_63 = (r_33 << WORD_BITS) | lo_32(p_64);
-        long q3_32 = p_63 / 1250000000;
-        r_33 = p_63 % 1250000000;
-        // restoring 3 lowest bits of the remainder:
-        r_33 = (r_33 << 3) + (lo_64 & 0x7);
-
-        // second division: by scale
-        downScale_63_31(q1_63, scale); // ignore high word (overflow)
-        long qh_32 = downScale_63_31((a << WORD_BITS) | q2_32, scale);
-        long ql_32 = downScale_63_31((a << WORD_BITS) | q3_32, scale);
-
-        a = a * 10000000000L + r_33; // final remainder
-        return (qh_32 << WORD_BITS) | ql_32; // final quotient (overflow possible)
+        if (r_33 != -1) {
+            a = a * 10000000000L + r_33; // need to consider remainder of first division by 10^10
+        }
+        return (result_63o << WORD_BITS) | ql_32;
     }
 
     long downScale_63_31(long v_63, int scale) {

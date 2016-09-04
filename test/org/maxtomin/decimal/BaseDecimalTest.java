@@ -142,15 +142,20 @@ public class BaseDecimalTest {
     }
 
     private void testMulScale(long a, long b, int scale) {
-        long q = decimal.mulscale_63o_31(a, b, scale);
-        long r = decimal.getA();
         BigInteger[] dAndR = BigInteger.valueOf(a)
                 .multiply(BigInteger.valueOf(b))
                 .divideAndRemainder(BigInteger.TEN.pow(scale));
-        if (dAndR[0].compareTo(BigInteger.valueOf(Long.MAX_VALUE)) <= 0) {
+
+        try {
+            long q = decimal.mulscale_63o_31(a, b, scale);
+            long r = decimal.getA();
             assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));
             assertEquals("Remainder", dAndR[1], BigInteger.valueOf(r));
-        } // else - overflow
+        } catch (ArithmeticException e) {
+            // overflow
+            assertTrue(dAndR[0].compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0);
+            return;
+        }
     }
 
     private void testMulScaleNoOverflow(long a, long b, int scale) {
