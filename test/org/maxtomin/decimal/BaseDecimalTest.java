@@ -33,21 +33,21 @@ public class BaseDecimalTest {
     }
 
     @Test
-    public void testMulDiv() throws Exception {
-        testMulDiv(1, 1, 1);
-        testMulDiv(1000, 1, 1);
-        testMulDiv(1, 1, 1000);
-        testMulDiv(10, 15, 7);
-        testMulDivOverflow(Long.MAX_VALUE, Integer.MAX_VALUE, 1);
-        testMulDiv(Long.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE);
-        testMulDiv(Long.MAX_VALUE, Integer.MAX_VALUE, Long.MAX_VALUE);
+    public void testScaleDiv() throws Exception {
+        testScaleDiv(1, 1, 1);
+        testScaleDiv(1000, 1, 1);
+        testScaleDiv(1, 1, 1000);
+        testScaleDiv(10, 9, 7);
+        testScaleDiv(Long.MAX_VALUE, 9, 1);
+        testScaleDiv(Long.MAX_VALUE, 9, Integer.MAX_VALUE);
+        testScaleDiv(Long.MAX_VALUE, 9, Long.MAX_VALUE);
 
-        testMulDiv(1234568L, Integer.MAX_VALUE, 1L);
-        testMulDiv(449033535071450778L, 2147483647, 12L);
-        testMulDiv(303601908757L, Integer.MAX_VALUE, 659820219978L);
-        testMulDiv(449033535071450778L, Integer.MAX_VALUE, 659820219978L);
-        testMulDiv(0x400000000000L, 0x400000, Long.MAX_VALUE);
-        testMulDiv(4026532095L, 16777215, 67553994662215680L);
+        testScaleDiv(1234568L, 9, 1L);
+        testScaleDiv(449033535071450778L, 9, 12L);
+        testScaleDiv(303601908757L, 9, 659820219978L);
+        testScaleDiv(449033535071450778L, 9, 659820219978L);
+        testScaleDiv(0x400000000000L, 4, Long.MAX_VALUE);
+        testScaleDiv(4026532095L, 4, 67553994662215680L);
     }
 
     @Test
@@ -74,18 +74,18 @@ public class BaseDecimalTest {
         testMulScale(9223372032559808512L, 9223372036854775807L, 2);
         testMulScale(9223372036854775807L, 8446744073709551615L, 3);
 
-        testMulScaleNoOverflow(1234568L, Integer.MAX_VALUE, 9);
-        testMulScaleNoOverflow(449033535071450778L, 2147483647, 9);
-        testMulScaleNoOverflow(4984198405165L, 6132198419878L, 9);
-        testMulScaleNoOverflow(1540173641653L, 1015059321913L, 9);
-        testMulScaleNoOverflow(44903353507145L, 3155170653582L, 9);
-        testMulScaleNoOverflow(303601908757L, 829267376026L, 9);
-        testMulScaleNoOverflow(4490335350714L, 829267376026L, 9);
-        testMulScaleNoOverflow(1234568, 829267376026L, 9);
-        testMulScaleNoOverflow(Integer.MAX_VALUE, 779800372112079L, 9);
-        testMulScaleNoOverflow(Integer.MAX_VALUE, 2147483648L, 9);
-        testMulScaleNoOverflow(Integer.MAX_VALUE, 922337203685477L, 9);
-        testMulScaleNoOverflow(Integer.MAX_VALUE, 844674407370955L, 9);
+        testMulScale(1234568L, Integer.MAX_VALUE, 9);
+        testMulScale(449033535071450778L, 2147483647, 9);
+        testMulScale(4984198405165L, 6132198419878L, 9);
+        testMulScale(1540173641653L, 1015059321913L, 9);
+        testMulScale(44903353507145L, 3155170653582L, 9);
+        testMulScale(303601908757L, 829267376026L, 9);
+        testMulScale(4490335350714L, 829267376026L, 9);
+        testMulScale(1234568, 829267376026L, 9);
+        testMulScale(Integer.MAX_VALUE, 779800372112079L, 9);
+        testMulScale(Integer.MAX_VALUE, 2147483648L, 9);
+        testMulScale(Integer.MAX_VALUE, 922337203685477L, 9);
+        testMulScale(Integer.MAX_VALUE, 844674407370955L, 9);
 
         testMulScale(1234568L, Integer.MAX_VALUE, 18);
         testMulScale(449033535071450778L, 2147483647, 18);
@@ -146,55 +146,39 @@ public class BaseDecimalTest {
                 .multiply(BigInteger.valueOf(b))
                 .divideAndRemainder(BigInteger.TEN.pow(scale));
 
-        try {
-            long q = decimal.mulscale_63o_31(a, b, scale);
-            long r = decimal.getA();
+        long q = decimal.mulscale_63o_31(a, b, scale);
+        long r = decimal.a;
+        if (q != AbstractDecimal.NaN) {
             assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));
             assertEquals("Remainder", dAndR[1], BigInteger.valueOf(r));
-        } catch (ArithmeticException e) {
+        } else {
             // overflow
             assertTrue(dAndR[0].compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0);
-            return;
         }
     }
 
-    private void testMulScaleNoOverflow(long a, long b, int scale) {
-        long q = decimal.mulscale_63o_31(a, b, scale);
-        long r = decimal.getA();
-        BigInteger[] dAndR = BigInteger.valueOf(a)
-                .multiply(BigInteger.valueOf(b))
-                .divideAndRemainder(BigInteger.TEN.pow(scale));
-        assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));
-        assertEquals("Remainder", dAndR[1], BigInteger.valueOf(r));
-    }
-
-    private void testMulDivOverflow(long v, int m, long d) {
-        decimal.muldiv_63o_63(v, m, d); // just check asserts
-        assertTrue(BigInteger.valueOf(v)
-                .multiply(BigInteger.valueOf(m))
-                .divide(BigInteger.valueOf(d))
-                .compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0);
-    }
-
-    private void testMulDiv(long v, int m, long d) {
+    private void testScaleDiv(long v, int s, long d) {
         try {
-            long q = decimal.muldiv_63o_63(v, m, d);
-            long r = decimal.getA();
+            BigInteger[] dAndR = BigInteger.valueOf(v).multiply(BigInteger.TEN.pow(s)).divideAndRemainder(BigInteger.valueOf(d));
 
-            BigInteger[] dAndR = BigInteger.valueOf(v).multiply(BigInteger.valueOf(m)).divideAndRemainder(BigInteger.valueOf(d));
-            if (dAndR[0].compareTo(BigInteger.valueOf(Long.MAX_VALUE)) <= 0) {
+            long q = decimal.scalediv_63o_63(v, s, d);
+            long r = decimal.a;
+            if (q != AbstractDecimal.NaN) {
                 assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));
                 assertEquals("Remainder", dAndR[1], BigInteger.valueOf(r));
-            } // else - overflow
+            } else {
+                // zero dividend or overflow
+                assertTrue(d == 0 || dAndR[0].compareTo(BigInteger.valueOf(Long.MAX_VALUE)) > 0);
+            }
         } catch (AssertionError e) {
-            System.out.println("Failed for " + v + ", " + m + ", " + d);
+            System.out.println("Failed for " + v + ", " + s + ", " + d);
             throw e;
         }
     }
 
     private void testMulHi(long a, long b) {
         long hi = decimal.mulhi_63_32(a, b);
-        long lo = decimal.getA();
+        long lo = decimal.a;
         assertEquals(BigInteger.valueOf(hi).shiftLeft(BaseDecimal.WORD_BITS).add(BigInteger.valueOf(lo)),
                 BigInteger.valueOf(a).multiply(BigInteger.valueOf(b)));
     }
@@ -210,7 +194,7 @@ public class BaseDecimalTest {
     }
 
     public static void main(String[] args) {
-        // bulk test testMulDiv
+        // bulk test
         BaseDecimalTest test = new BaseDecimalTest();
         for (int i = 0; i < 65536; i++) {
             long v = replaceBitsWithF(i);

@@ -17,19 +17,23 @@ public class BaseDecimal {
             100000000,
             1000000000,
     };
+    static final long[] SCALE_OVERFLOW_LIMITS = {
+            Long.MAX_VALUE / 1,
+            Long.MAX_VALUE / 10,
+            Long.MAX_VALUE / 100,
+            Long.MAX_VALUE / 1000,
+            Long.MAX_VALUE / 10000,
+            Long.MAX_VALUE / 100000,
+            Long.MAX_VALUE / 1000000,
+            Long.MAX_VALUE / 10000000,
+            Long.MAX_VALUE / 100000000,
+            Long.MAX_VALUE / 1000000000,
+    };
     static final int WORD_BITS = 32;
     static final long WORD_CARRY = 1L << WORD_BITS;
     static final long WORD_LO_MASK = WORD_CARRY - 1;
 
-    private long a; // accumulator
-
-    long getA() {
-        return a;
-    }
-
-    void setRaw(long a) {
-        this.a = a;
-    }
+    long a; // accumulator
 
     long mulhi_63_32(long a_63, long b_32) {
         long hi_31 = hi_32(a_63);
@@ -41,42 +45,55 @@ public class BaseDecimal {
         return rHi_63;
     }
 
-    long mulDivRound(long v, int m, long d, RoundingMode roundingMode) {
+    long scaleDivRound(long v, int s, long d, RoundingMode roundingMode) {
+        if (v == AbstractDecimal.NaN || d == AbstractDecimal.NaN || d == 0) {
+            return AbstractDecimal.NaN;
+        }
+
         long sign1 = v >> 63;
         long sign2 = d >> 63;
 
         v = negIf(v, sign1); // ~v - 1 if negative
         d = negIf(d, sign2);
 
-        long result = muldiv_63o_63(v, m, d);
+        long result = scalediv_63o_63(v, s, d);
+        if (result == AbstractDecimal.NaN) {
+            return result;
+        }
 
         sign1 ^= sign2;
 
         return round(negIf(result, sign1), negIf(a, sign1), d, roundingMode);
     }
 
-    long muldiv_63o_63(long v_63, int m_31, long d_63) {
-        long offset_63o = 0;
+    long scalediv_63o_63(long v_63, int scale, long d_63) {
+        long offset_63 = 0;
         if (v_63 >= d_63) {
             // v * m / d = (v / d * d + v % d) * m / d = v / d * m + v % d * m / d
-            offset_63o = v_63 / d_63;
+            offset_63 = v_63 / d_63;
             v_63 = v_63 % d_63;
 
-            offset_63o *= m_31; // overflow possible here
+            if (offset_63 > SCALE_OVERFLOW_LIMITS[scale]) {
+                return AbstractDecimal.NaN; // overflow
+            }
+            offset_63 *= POW10[scale]; // overflow possible here
         }
         assert v_63 < d_63 : "and therefore quotient < m_31 <= Integer.MAX_VALUE";
 
-        long p_63 = mulhi_63_32(v_63, m_31);
+        long p_63 = mulhi_63_32(v_63, POW10[scale]);
         long p_32 = a;
 
         if (d_63 <= Integer.MAX_VALUE) {
             assert v_63 <= Integer.MAX_VALUE;
-            v_63 *= m_31; // no overflow
+            v_63 *= POW10[scale]; // no overflow
 
             // simple division
-            offset_63o += v_63 / d_63; // quotient (considering the offset)
+            offset_63 += v_63 / d_63; // quotient (considering the offset)
+            if (offset_63 < 0) {
+                return AbstractDecimal.NaN; // overflow
+            }
             a = v_63 % d_63; // remainder
-            return offset_63o;
+            return offset_63;
         }
 
         // normalizing:
@@ -128,21 +145,32 @@ public class BaseDecimal {
         assert remainder >= 0 && remainder < d_63 : "no more than 1 correction up";
 
         a = remainder >> shift;
-        return offset_63o + qhat_32;
+        offset_63 += qhat_32;
+        if (offset_63 < 0) {
+            throw new ArithmeticException(OVERFLOW_EXCEPTION);
+        }
+        return offset_63;
     }
 
-    long mulScaleRound(long v, long m, int scale, RoundingMode roundingMode) {
-        long sign1 = v >> 63;
-        long sign2 = m >> 63;
+    long mulScaleRound(long a, long b, int scale, RoundingMode roundingMode) {
+        if (a == AbstractDecimal.NaN || b == AbstractDecimal.NaN) {
+            return AbstractDecimal.NaN;
+        }
 
-        v = negIf(v, sign1);
-        m = negIf(m, sign2);
+        long sign1 = a >> 63;
+        long sign2 = b >> 63;
 
-        long result = mulscale_63o_31(v, m, scale);
+        a = negIf(a, sign1);
+        b = negIf(b, sign2);
+
+        long result = mulscale_63o_31(a, b, scale);
+        if (result == AbstractDecimal.NaN) {
+            return result;
+        }
 
         sign1 ^= sign2;
 
-        return round(negIf(result, sign1), negIf(a, sign1), POW10[scale], roundingMode);
+        return round(negIf(result, sign1), negIf(this.a, sign1), POW10[scale], roundingMode);
     }
 
     long mulscale_63o_31(long a_63, long b_63, int scale) {
@@ -195,7 +223,7 @@ public class BaseDecimal {
             scale -= 10;
         } else {
             if (p_63 < 0 || p_63 > Integer.MAX_VALUE) {
-                throw new ArithmeticException(OVERFLOW_EXCEPTION);
+                return AbstractDecimal.NaN; // overflow
             }
 
             // move everything to 3 words: p[63][32]
@@ -209,7 +237,7 @@ public class BaseDecimal {
         long ql_32 = downScale_63_31((a << WORD_BITS) | p_32, scale);
 
         if (result_63o < 0 || result_63o > Integer.MAX_VALUE) {
-            throw new ArithmeticException(OVERFLOW_EXCEPTION);
+            return AbstractDecimal.NaN; // overflow
         }
 
         if (r_33 != -1) {
@@ -257,17 +285,55 @@ public class BaseDecimal {
         }
     }
 
+    long unsignedDownScale_64_31(long v_64, int scale) {
+        // supports unsigned values
+        a = v_64 & 0x1;
+        v_64 >>>= 1;
+        switch (scale) {
+            case 1:
+                a = (v_64 % 5);
+                return v_64 / 5;
+            case 2:
+                a |= (v_64 % 50) << 1;
+                return v_64 / 50;
+            case 3:
+                a |= (v_64 % 500) << 1;
+                return v_64 / 500;
+            case 4:
+                a |= (v_64 % 5000) << 1;
+                return v_64 / 5000;
+            case 5:
+                a |= (v_64 % 50000) << 1;
+                return v_64 / 50000;
+            case 6:
+                a |= (v_64 % 500000) << 1;
+                return v_64 / 500000;
+            case 7:
+                a |= (v_64 % 5000000) << 1;
+                return v_64 / 5000000;
+            case 8:
+                a |= (v_64 % 50000000) << 1;
+                return v_64 / 50000000;
+            case 9:
+                a |= (v_64 % 500000000) << 1;
+                return v_64 / 500000000;
+            default:
+                throw new IllegalArgumentException("Incorrect scale: " + scale);
+        }
+    }
+
 
     /**
-     * Round common (and mixed) fractions
+     * Round common (and mixed) fractions.
+     * @param whole can be positive or negative
+     * @param denominator must be positive.
+     * @param numerator (unless it's 0) must have the sign of the whole
+     * @param roundingMode all modes supported, NaN if UNNECESSARY check fails
      */
     protected static long round(long whole, long numerator, long denominator, RoundingMode roundingMode) {
         switch (roundingMode) {
             case UNNECESSARY: // 7
-                if (numerator != 0) {
-                    throw new IllegalArgumentException("Rounding required, result = " + whole + " " + Math.abs(numerator) + "/" + denominator);
-                }
-                return whole;
+                return numerator == 0 ? whole : AbstractDecimal.NaN;
             case HALF_EVEN: // 6
                 denominator -= whole & 0x1; // HALF_UP for odd, making denominator < numerator * 2, else HALF_DOWN
                 // fall through
@@ -304,10 +370,6 @@ public class BaseDecimal {
         return v_64 & WORD_LO_MASK;
     }
 
-    private static long negIf(long v, long sign) {
-        return v ^ sign + sign; // if sign == -1, then return ~v - 1 == -v
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -331,6 +393,10 @@ public class BaseDecimal {
         System.out.println(Long.toHexString(Integer.MAX_VALUE / 2 + 1));
         System.out.println(Long.toHexString(Long.MAX_VALUE));
         System.out.println(Long.toHexString((Long.MAX_VALUE - 1) / (Integer.MAX_VALUE / 2 + 1)));
+    }
+
+    static long negIf(long v, long sign) {
+        return v ^ sign + sign; // if sign == -1, then return ~v - 1 == -v
     }
 }
 
