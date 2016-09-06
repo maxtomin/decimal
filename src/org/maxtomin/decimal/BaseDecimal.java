@@ -17,6 +17,27 @@ public class BaseDecimal {
             100000000,
             1000000000,
     };
+    static final long[] LONG_POW10 = {
+            1,
+            10,
+            100,
+            1000,
+            10000,
+            100000,
+            1000000,
+            10000000,
+            100000000,
+            1000000000,
+            10000000000L,
+            100000000000L,
+            1000000000000L,
+            10000000000000L,
+            100000000000000L,
+            1000000000000000L,
+            10000000000000000L,
+            100000000000000000L,
+            1000000000000000000L,
+    };
     static final long[] SCALE_OVERFLOW_LIMITS = {
             Long.MAX_VALUE,
             Long.MAX_VALUE / 10,
@@ -193,7 +214,7 @@ public class BaseDecimal {
 
         sign1 ^= sign2;
 
-        return round(negIf(result, sign1), negIf(this.a, sign1), POW10[scale], roundingMode);
+        return round(negIf(result, sign1), negIf(this.a, sign1), LONG_POW10[scale], roundingMode);
     }
 
     long mulscale_63o_31(long a_63, long b_63, int scale) {
@@ -348,6 +369,8 @@ public class BaseDecimal {
 
     /**
      * Round common (and mixed) fractions.
+     * Ca not take NaN, but can produce NaN (e.g. failed UNNECESSARY or rounding up +-MAX_VALUE)
+     *
      * @param whole can be positive or negative
      * @param denominator must be positive.
      * @param numerator (unless it's 0) must have the sign of the whole

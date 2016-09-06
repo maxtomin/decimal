@@ -274,13 +274,13 @@ public class BaseDecimalTest {
                 continue;
             }
             System.out.println(i);
-            for (int j = 0; j <= 18; j++) {
+            for (int j = 0; j <= 9; j++) {
                 for (int k = 0; k < 65536; k++) {
                     long d = replaceBitsWithF(k);
                     if (d <= 0) {
                         continue;
                     }
-                    test.testMulScale(v, d, j);
+                    test.testScaleDiv(v, j, d);
                 }
             }
         }

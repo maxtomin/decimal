@@ -1,9 +1,12 @@
 package org.maxtomin.decimal;
 
+import com.sun.istack.internal.Nullable;
+
+import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.ParseException;
 
-public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDecimal implements Comparable<T> {
+public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDecimal implements Comparable<T>, Cloneable {
     public static final long NaN = Long.MIN_VALUE;
 
     protected abstract int getScale();
@@ -79,12 +82,25 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
         int scale = getScale() - a.getScale();
         if (scale < 0 && !isNaN() && !a.isNaN()) {
             long self = getRaw();
-            long other = downScale_63_31(a.getRaw(), POW10[scale]);
+            long other = downScale_63_31(a.getRaw(), -scale);
             long remainder = getRaw();
 
-            long result = addWithOverflow(self, other);
+            // have to inline addWithOverflow here to avoid extra if
+            long result = self + other;
+            if (self == NaN || other == NaN || (result < 0) != (self < 0) && (result < 0) != (other < 0)) {
+                return setRaw(NaN);
+            }
 
-            return setRaw(round(result, remainder, POW10[-scale], roundingMode));
+            int denominator = POW10[-scale];
+            if (result < 0 && remainder > 0) {
+                remainder -= denominator;
+                ++result;
+            } else if (result > 0 && remainder < 0) {
+                remainder += denominator;
+                --result;
+            }
+
+            return setRaw(round(result, remainder, denominator, roundingMode));
         }
 
         return add(a.getRaw(), scale);
@@ -134,13 +150,30 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     public <V extends AbstractDecimal> T minus(V a, V b, RoundingMode roundingMode) {
         b.negate();
         plus(a, b, roundingMode);
-        return setRaw(-getRaw()); // negate back without NaN check
+        b.negate();
+        return self();
+    }
+
+    public T minus(long a, long b) {
+        return plus(a, -b);
     }
 
     public <V extends AbstractDecimal> T subtract(V a, RoundingMode roundingMode) {
         a.negate();
         add(a, roundingMode);
-        return setRaw(-getRaw()); // negate back without NaN check
+        a.negate();
+        return self();
+    }
+
+    public T subtract(T a) {
+        a.negate();
+        plus(this, a, RoundingMode.DOWN);
+        a.negate();
+        return self();
+    }
+
+    public T subtract(long a) {
+        return add(-a);
     }
 
     public <V extends AbstractDecimal> T product(V a, V b, RoundingMode roundingMode) {
@@ -150,14 +183,14 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
         int scale = a.getScale() + b.getScale() - getScale();
         if (scale >= 0) {
-            return setRaw(scaleWithOverflow(mulWithOverflow(a.getRaw(), a.getRaw()), scale));
+            return setRaw(mulScaleRound(a.getRaw(), b.getRaw(), scale, roundingMode));
         } else {
-            return setRaw(mulScaleRound(a.getRaw(), b.getRaw(), -scale, roundingMode));
+            return setRaw(scaleWithOverflow(mulWithOverflow(a.getRaw(), b.getRaw()), -scale));
         }
     }
 
-    public T product(long a, long b, RoundingMode roundingMode) {
-        return setRaw(mulScaleRound(a, b, getScale(), roundingMode));
+    public T product(long a, long b) {
+        return setRaw(scaleWithOverflow(mulWithOverflow(a, b), getScale()));
     }
 
     public <V extends AbstractDecimal> T mul(V a, RoundingMode roundingMode) {
@@ -196,6 +229,16 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
         return setRaw(round(raw / a, raw % a, a, roundingMode));
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public T clone() {
+        try {
+            return (T) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException("Unexpected", e);
+        }
+    }
+
     @Override
     public int compareTo(AbstractDecimal o) {
         long saved = getRaw();
@@ -216,6 +259,11 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
         setRaw(saved);
         return result;
+    }
+
+    @Nullable
+    public BigDecimal toBigDecimal() {
+        return !isNaN() ? BigDecimal.valueOf(getRaw()).divide(BigDecimal.TEN.pow(getScale())) : null;
     }
 
     public String toString() {
@@ -347,7 +395,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
             // can multiply without overflow
             return a * b;
         } else {
-            return mulScaleRound(a, b, 0, RoundingMode.UNNECESSARY);
+            return mulScaleRound(a, b, 0, RoundingMode.DOWN);
         }
     }
 
