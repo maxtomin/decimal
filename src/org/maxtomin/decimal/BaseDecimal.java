@@ -2,7 +2,7 @@ package org.maxtomin.decimal;
 
 import java.math.RoundingMode;
 
-public class BaseDecimal {
+abstract class BaseDecimal extends Number {
     public static final String OVERFLOW_EXCEPTION = "Overflow";
 
     static final int[] POW10 = {
@@ -416,6 +416,10 @@ public class BaseDecimal {
         return v_64 & WORD_LO_MASK;
     }
 
+    static long negIf(long v, long sign) {
+        return (v ^ sign) - sign; // if sign == -1, then return ~v + 1 == -v
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -433,16 +437,6 @@ public class BaseDecimal {
     @Override
     public int hashCode() {
         return (int) (a ^ (a >>> 32));
-    }
-
-    public static void main(String[] args) {
-        System.out.println(Long.toHexString(Integer.MAX_VALUE / 2 + 1));
-        System.out.println(Long.toHexString(Long.MAX_VALUE));
-        System.out.println(Long.toHexString((Long.MAX_VALUE - 1) / (Integer.MAX_VALUE / 2 + 1)));
-    }
-
-    static long negIf(long v, long sign) {
-        return (v ^ sign) - sign; // if sign == -1, then return ~v + 1 == -v
     }
 }
 

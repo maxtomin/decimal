@@ -13,7 +13,27 @@ import static org.junit.Assert.assertTrue;
 import static org.maxtomin.decimal.AbstractDecimal.NaN;
 
 public class BaseDecimalTest {
-    private final BaseDecimal decimal = new BaseDecimal();
+    private final BaseDecimal decimal = new BaseDecimal() {
+        @Override
+        public int intValue() {
+            return 0;
+        }
+
+        @Override
+        public long longValue() {
+            return 0;
+        }
+
+        @Override
+        public float floatValue() {
+            return 0;
+        }
+
+        @Override
+        public double doubleValue() {
+            return 0;
+        }
+    };
 
     @Test
     public void testMulHi() throws Exception {

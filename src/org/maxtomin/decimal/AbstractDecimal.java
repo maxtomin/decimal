@@ -1,11 +1,13 @@
 package org.maxtomin.decimal;
 
-import com.sun.istack.internal.Nullable;
-
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.ParseException;
 
+/**
+ * Fixed point number
+ *
+ * @param <T>
+ */
 public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDecimal implements Comparable<T>, Cloneable {
     public static final long NaN = Long.MIN_VALUE;
 
@@ -261,9 +263,78 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
         return result;
     }
 
-    @Nullable
-    public BigDecimal toBigDecimal() {
-        return !isNaN() ? BigDecimal.valueOf(getRaw()).divide(BigDecimal.TEN.pow(getScale())) : null;
+    @Override
+    public byte byteValue() {
+        return (byte) toLong(RoundingMode.DOWN);
+    }
+
+    @Override
+    public short shortValue() {
+        return (short) toLong(RoundingMode.DOWN);
+    }
+
+    @Override
+    public int intValue() {
+        return (int) toLong(RoundingMode.DOWN);
+    }
+
+    @Override
+    public long longValue() {
+        return toLong(RoundingMode.DOWN);
+    }
+
+    @Override
+    public float floatValue() {
+        return (float) toDouble();
+    }
+
+    @Override
+    public double doubleValue() {
+        return toDouble();
+    }
+
+    public long toLong(RoundingMode roundingMode) {
+        if (isNaN()) {
+            throw new ArithmeticException("NaN");
+        }
+
+
+        long raw = getRaw(); // will be overridden by remainder
+
+        int scale = getScale();
+        long result = round(downScale_63_31(raw, scale), getRaw(), POW10[scale], roundingMode);
+
+        setRaw(raw);
+
+        return result;
+    }
+
+    public T fromLong(long value) {
+        return setRaw(scaleWithOverflow(value, getScale()));
+    }
+
+    public double toDouble() {
+        return !isNaN() ? (double) getRaw() / POW10[getScale()] : Double.NaN;
+    }
+
+    public T fromDouble(double value, RoundingMode roundingMode) {
+        value *= POW10[getScale()];
+        switch (roundingMode) {
+            case DOWN:
+                return setIntDouble(value);
+            case FLOOR:
+                return setIntDouble(Math.floor(value));
+            case CEILING:
+                return setIntDouble(Math.ceil(value));
+            case HALF_EVEN:
+                return setIntDouble(Math.rint(value));
+            default:
+                throw new IllegalArgumentException("Unsupported rounding mode for double: " + roundingMode);
+        }
+    }
+
+    private T setIntDouble(double value) {
+        return setRaw(value >= -Long.MAX_VALUE && value <= Long.MAX_VALUE ? (long) value : NaN);
     }
 
     public String toString() {

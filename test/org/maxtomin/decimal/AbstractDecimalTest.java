@@ -7,6 +7,7 @@ import java.math.RoundingMode;
 import java.text.ParseException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.maxtomin.decimal.AbstractDecimal.NaN;
 
@@ -91,6 +92,72 @@ public class AbstractDecimalTest {
             fail("Exception expected");
         } catch (ParseException e) {
         }
+    }
+
+    @Test
+    public void testToFromLong() throws Exception {
+        assertEquals("123.0", new TestDecimal(1).fromLong(123).toString());
+        assertEquals("1000000000000000000", new TestDecimal(0).fromLong(1000000000000000000L).toString());
+        assertEquals("NaN", new TestDecimal(1).fromLong(1000000000000000000L).toString());
+        assertEquals("NaN", new TestDecimal(0).fromLong(Long.MIN_VALUE).toString());
+
+        assertEquals(123L, new TestDecimal(1).setRaw(1230).toLong(RoundingMode.UNNECESSARY));
+        assertEquals(123L, new TestDecimal(1).setRaw(1235).toLong(RoundingMode.DOWN));
+        assertEquals(124L, new TestDecimal(1).setRaw(1235).toLong(RoundingMode.UP));
+        assertEquals(-123L, new TestDecimal(1).setRaw(-1235).toLong(RoundingMode.CEILING));
+        assertEquals(-124L, new TestDecimal(1).setRaw(-1235).toLong(RoundingMode.UP));
+    }
+
+    @Test
+    public void testToFromDouble() throws Exception {
+        for (RoundingMode roundingMode : new RoundingMode[] {RoundingMode.DOWN, RoundingMode.FLOOR, RoundingMode.CEILING, RoundingMode.HALF_EVEN}) {
+            assertEquals("123.0", new TestDecimal(1).fromDouble(123.0, roundingMode).toString());
+            assertEquals("1000000000000000000", new TestDecimal(0).fromDouble(1e18, roundingMode).toString());
+            assertEquals("NaN", new TestDecimal(1).fromDouble(1e18, roundingMode).toString());
+            assertEquals("NaN", new TestDecimal(1).fromDouble(Double.POSITIVE_INFINITY, roundingMode).toString());
+            assertEquals("NaN", new TestDecimal(1).fromDouble(Double.NEGATIVE_INFINITY, roundingMode).toString());
+            assertEquals("NaN", new TestDecimal(1).fromDouble(Double.NaN, roundingMode).toString());
+        }
+
+        assertEquals("0", new TestDecimal(0).fromDouble(0.0, RoundingMode.DOWN).toString());
+        assertEquals("0", new TestDecimal(0).fromDouble(0.5, RoundingMode.DOWN).toString());
+        assertEquals("0", new TestDecimal(0).fromDouble(-0.5, RoundingMode.DOWN).toString());
+        assertEquals("1", new TestDecimal(0).fromDouble(1.5, RoundingMode.DOWN).toString());
+        assertEquals("-1", new TestDecimal(0).fromDouble(-1.5, RoundingMode.DOWN).toString());
+        assertEquals("1", new TestDecimal(0).fromDouble(1.7, RoundingMode.DOWN).toString());
+        assertEquals("-1", new TestDecimal(0).fromDouble(-1.7, RoundingMode.DOWN).toString());
+
+        assertEquals("0", new TestDecimal(0).fromDouble(0.0, RoundingMode.FLOOR).toString());
+        assertEquals("0", new TestDecimal(0).fromDouble(0.5, RoundingMode.FLOOR).toString());
+        assertEquals("-1", new TestDecimal(0).fromDouble(-0.5, RoundingMode.FLOOR).toString());
+        assertEquals("1", new TestDecimal(0).fromDouble(1.5, RoundingMode.FLOOR).toString());
+        assertEquals("-2", new TestDecimal(0).fromDouble(-1.5, RoundingMode.FLOOR).toString());
+        assertEquals("1", new TestDecimal(0).fromDouble(1.7, RoundingMode.FLOOR).toString());
+        assertEquals("-2", new TestDecimal(0).fromDouble(-1.7, RoundingMode.FLOOR).toString());
+
+        assertEquals("0", new TestDecimal(0).fromDouble(0.0, RoundingMode.CEILING).toString());
+        assertEquals("1", new TestDecimal(0).fromDouble(0.5, RoundingMode.CEILING).toString());
+        assertEquals("0", new TestDecimal(0).fromDouble(-0.5, RoundingMode.CEILING).toString());
+        assertEquals("2", new TestDecimal(0).fromDouble(1.5, RoundingMode.CEILING).toString());
+        assertEquals("-1", new TestDecimal(0).fromDouble(-1.5, RoundingMode.CEILING).toString());
+        assertEquals("2", new TestDecimal(0).fromDouble(1.7, RoundingMode.CEILING).toString());
+        assertEquals("-1", new TestDecimal(0).fromDouble(-1.7, RoundingMode.CEILING).toString());
+
+        assertEquals("0", new TestDecimal(0).fromDouble(0.0, RoundingMode.HALF_EVEN).toString());
+        assertEquals("0", new TestDecimal(0).fromDouble(0.5, RoundingMode.HALF_EVEN).toString());
+        assertEquals("0", new TestDecimal(0).fromDouble(-0.5, RoundingMode.HALF_EVEN).toString());
+        assertEquals("2", new TestDecimal(0).fromDouble(1.5, RoundingMode.HALF_EVEN).toString());
+        assertEquals("-2", new TestDecimal(0).fromDouble(-1.5, RoundingMode.HALF_EVEN).toString());
+        assertEquals("2", new TestDecimal(0).fromDouble(1.7, RoundingMode.HALF_EVEN).toString());
+        assertEquals("-2", new TestDecimal(0).fromDouble(-1.7, RoundingMode.HALF_EVEN).toString());
+        assertEquals("1", new TestDecimal(0).fromDouble(1.3, RoundingMode.HALF_EVEN).toString());
+        assertEquals("-1", new TestDecimal(0).fromDouble(-1.3, RoundingMode.HALF_EVEN).toString());
+
+        assertTrue(123.0 == new TestDecimal(1).setRaw(1230).toDouble());
+        assertTrue(123.5 == new TestDecimal(1).setRaw(1235).toDouble());
+        assertTrue(12.30 == new TestDecimal(2).setRaw(1230).toDouble());
+        assertTrue(12.35 == new TestDecimal(2).setRaw(1235).toDouble());
+        assertTrue(Double.isNaN(new TestDecimal(2).setRaw(NaN).toDouble()));
     }
 
     @Test
@@ -430,15 +497,15 @@ public class AbstractDecimalTest {
 
     private void comboTest(TestDecimal value1, TestDecimal value2) {
         try {
-            BigDecimal bd1 = value1.toBigDecimal();
-            BigDecimal bd2 = value2.toBigDecimal();
+            BigDecimal bd1 = BigDecimal.valueOf(value1.getRaw()).divide(BigDecimal.TEN.pow(value1.getScale()));
+            BigDecimal bd2 = BigDecimal.valueOf(value2.getRaw()).divide(BigDecimal.TEN.pow(value2.getScale()));
             assertEquals(round(bd1.add(bd2), value1.getScale()), value1.clone().add(value2, RoundingMode.DOWN).getRaw());
             assertEquals(round(bd1.subtract(bd2), value1.getScale()), value1.clone().subtract(value2, RoundingMode.DOWN).getRaw());
             assertEquals(round(bd1.multiply(bd2), value1.getScale()), value1.clone().mul(value2, RoundingMode.DOWN).getRaw());
             assertEquals(round(bd1.divide(bd2), value1.getScale()), value1.clone().div(value2, RoundingMode.DOWN).getRaw());
 
             TestDecimal value3 = value1.clone().setRaw(value2.getRaw());
-            BigDecimal bd3 = value3.toBigDecimal();
+            BigDecimal bd3 = BigDecimal.valueOf(value3.getRaw()).divide(BigDecimal.TEN.pow(value3.getScale()));
             assertEquals(round(bd1.add(bd3), value1.getScale()), value1.clone().plus(value1, value3, RoundingMode.DOWN).getRaw());
             assertEquals(round(bd1.subtract(bd3), value1.getScale()), value1.clone().minus(value1, value3, RoundingMode.DOWN).getRaw());
             assertEquals(round(bd1.multiply(bd3), value1.getScale()), value1.clone().product(value1, value3, RoundingMode.DOWN).getRaw());
