@@ -67,12 +67,17 @@ public class AbstractDecimalTest {
         assertEquals(12300, new TestDecimal(4).parse("1.23").getRaw());
         assertEquals(123000, new TestDecimal(4).parse("12.3").getRaw());
         assertEquals(1230000, new TestDecimal(4).parse("123").getRaw());
+        assertEquals(1230000, new TestDecimal(4).parse("000000000000000123.00000000000000000").getRaw());
 
         assertEquals(-1230000, new TestDecimal(4).parse("-123").getRaw());
         assertEquals(0, new TestDecimal(4).parse("0").getRaw());
 
         assertEquals(Long.MAX_VALUE, new TestDecimal(0).parse("9223372036854775807").getRaw());
         assertEquals(-Long.MAX_VALUE, new TestDecimal(0).parse("-9223372036854775807").getRaw());
+        assertEquals(Long.MAX_VALUE, new TestDecimal(0).parse("9223372036854775807.0").getRaw());
+        assertEquals(-Long.MAX_VALUE, new TestDecimal(0).parse("-9223372036854775807.0").getRaw());
+        assertEquals(Long.MAX_VALUE, new TestDecimal(0).parse("000009223372036854775807.0").getRaw());
+        assertEquals(-Long.MAX_VALUE, new TestDecimal(0).parse("-0000009223372036854775807.0").getRaw());
         assertEquals(NaN, new TestDecimal(0).parse("NaN").getRaw());
         assertEquals(NaN, new TestDecimal(0).parse("nAn").getRaw());
 
@@ -158,6 +163,33 @@ public class AbstractDecimalTest {
         assertTrue(12.30 == new TestDecimal(2).setRaw(1230).toDouble());
         assertTrue(12.35 == new TestDecimal(2).setRaw(1235).toDouble());
         assertTrue(Double.isNaN(new TestDecimal(2).setRaw(NaN).toDouble()));
+    }
+
+    @Test
+    public void testCompareTo() throws ParseException {
+        assertTrue(new TestDecimal(1).parse("123").compareTo(new TestDecimal(1).parse("123")) == 0);
+        assertTrue(new TestDecimal(1).parse("123").compareTo(new TestDecimal(1).parse("124")) < 0);
+        assertTrue(new TestDecimal(1).parse("124").compareTo(new TestDecimal(1).parse("123")) > 0);
+
+        assertTrue(new TestDecimal(1).parse("123").compareTo(new TestDecimal(3).parse("123")) == 0);
+        assertTrue(new TestDecimal(1).parse("123").compareTo(new TestDecimal(3).parse("124")) < 0);
+        assertTrue(new TestDecimal(1).parse("124").compareTo(new TestDecimal(3).parse("123")) > 0);
+
+        assertTrue(new TestDecimal(3).parse("123").compareTo(new TestDecimal(1).parse("123")) == 0);
+        assertTrue(new TestDecimal(3).parse("123").compareTo(new TestDecimal(1).parse("124")) < 0);
+        assertTrue(new TestDecimal(3).parse("124").compareTo(new TestDecimal(1).parse("123")) > 0);
+
+        assertTrue(new TestDecimal(3).parse("0.0").compareTo(new TestDecimal(1).parse("0")) == 0);
+        assertTrue(new TestDecimal(3).parse("-0.1").compareTo(new TestDecimal(1).parse("0")) < 0);
+        assertTrue(new TestDecimal(3).parse("0.1").compareTo(new TestDecimal(1).parse("0")) > 0);
+
+        assertTrue(new TestDecimal(3).parse("0.123").compareTo(new TestDecimal(1).parse("12.0")) < 0);
+        assertTrue(new TestDecimal(3).parse("1.123").compareTo(new TestDecimal(0).parse("1")) > 0);
+        assertTrue(new TestDecimal(3).parse("1.000").compareTo(new TestDecimal(0).parse("1")) == 0);
+
+        assertTrue(new TestDecimal(9).parse("NaN").compareTo(new TestDecimal(0).parse("-1000000000000000000")) < 0);
+        assertTrue(new TestDecimal(9).parse("-1000000000").compareTo(new TestDecimal(0).parse("NaN")) > 0);
+        assertTrue(new TestDecimal(9).parse("NaN").compareTo(new TestDecimal(0).parse("NaN")) == 0);
     }
 
     @Test
@@ -503,6 +535,7 @@ public class AbstractDecimalTest {
             assertEquals(round(bd1.subtract(bd2), value1.getScale()), value1.clone().subtract(value2, RoundingMode.DOWN).getRaw());
             assertEquals(round(bd1.multiply(bd2), value1.getScale()), value1.clone().mul(value2, RoundingMode.DOWN).getRaw());
             assertEquals(round(bd1.divide(bd2), value1.getScale()), value1.clone().div(value2, RoundingMode.DOWN).getRaw());
+            assertEquals(Integer.signum(bd1.compareTo(bd2)), Integer.signum(value1.compareTo(value2)));
 
             TestDecimal value3 = value1.clone().setRaw(value2.getRaw());
             BigDecimal bd3 = BigDecimal.valueOf(value3.getRaw()).divide(BigDecimal.TEN.pow(value3.getScale()));
