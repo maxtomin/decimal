@@ -238,7 +238,7 @@ public class BaseDecimalTest {
                 .multiply(BigInteger.valueOf(b))
                 .divideAndRemainder(BigInteger.TEN.pow(scale));
 
-        long q = decimal.mulscale_63o_31(a, b, scale);
+        long q = decimal.mulscale_63_31(a, b, scale);
         long r = decimal.a;
         if (q != NaN) {
             assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));
@@ -253,7 +253,7 @@ public class BaseDecimalTest {
         try {
             BigInteger[] dAndR = BigInteger.valueOf(v).multiply(BigInteger.TEN.pow(s)).divideAndRemainder(BigInteger.valueOf(d));
 
-            long q = decimal.scalediv_63o_63(v, s, d);
+            long q = decimal.scalediv_63_63(v, s, d);
             long r = decimal.a;
             if (q != NaN) {
                 assertEquals("Quantity", dAndR[0], BigInteger.valueOf(q));

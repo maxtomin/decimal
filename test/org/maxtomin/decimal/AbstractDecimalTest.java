@@ -36,6 +36,18 @@ public class AbstractDecimalTest {
     }
 
     @Test
+    public void testSet() throws Exception {
+        assertEquals("123.00", quantity.set(price.fromDoubleRD(123.0)).toString());
+        assertEquals("123.00", quantity.setRD(price.fromDoubleRD(123.005)).toString());
+        assertEquals("123.01", quantity.set(price.fromDoubleRD(123.005), RoundingMode.UP).toString());
+
+        assertEquals("123.00", quantity.set(123).toString());
+        assertEquals("-123.00", quantity.set(-123).toString());
+        assertEquals("NaN", quantity.set(Long.MAX_VALUE).toString());
+        assertEquals("NaN", quantity.set(-Long.MAX_VALUE).toString());
+    }
+
+    @Test
     public void testToString() throws Exception {
         assertEquals("123", new TestDecimal(0).setRaw(123).toString());
         assertEquals("12.3", new TestDecimal(1).setRaw(123).toString());
@@ -107,7 +119,7 @@ public class AbstractDecimalTest {
         assertEquals("NaN", new TestDecimal(0).fromLong(Long.MIN_VALUE).toString());
 
         assertEquals(123L, new TestDecimal(1).setRaw(1230).toLong(RoundingMode.UNNECESSARY));
-        assertEquals(123L, new TestDecimal(1).setRaw(1235).toLong(RoundingMode.DOWN));
+        assertEquals(123L, new TestDecimal(1).setRaw(1235).toLongRD());
         assertEquals(124L, new TestDecimal(1).setRaw(1235).toLong(RoundingMode.UP));
         assertEquals(-123L, new TestDecimal(1).setRaw(-1235).toLong(RoundingMode.CEILING));
         assertEquals(-124L, new TestDecimal(1).setRaw(-1235).toLong(RoundingMode.UP));
@@ -219,6 +231,9 @@ public class AbstractDecimalTest {
         assertEquals("0.00", quantity().plus(price("92233720368.54775807"), price("-92233720368.54775807"), RoundingMode.UNNECESSARY).toString());
         assertEquals("0.00", quantity().plus(price("-92233720368.54775807"), price("92233720368.54775807"), RoundingMode.UNNECESSARY).toString());
         assertEquals("-184467440737.10", quantity().plus(price("-92233720368.54775807"), price("-92233720368.54775807"), RoundingMode.UP).toString());
+        // same, round DOWN
+        assertEquals("184467440737.09", quantity().plusRD(price("92233720368.54775807"), price("92233720368.54775807")).toString());
+        assertEquals("-184467440737.09", quantity().plusRD(price("-92233720368.54775807"), price("-92233720368.54775807")).toString());
 
         // Scaling overflows (can not be prevented)
         assertEquals("NaN", price().plus(quantity("92233720368547758.07"), quantity("92233720368547758.07"), RoundingMode.UP).toString());
@@ -262,6 +277,11 @@ public class AbstractDecimalTest {
         assertEquals("123.00", quantity("123").add(price("-0.00000001"), RoundingMode.UP).toString());
         assertEquals("-123.00", quantity("-123").add(price("0.00000001"), RoundingMode.UP).toString());
         assertEquals("-123.01", quantity("-123").add(price("-0.00000001"), RoundingMode.UP).toString());
+
+        assertEquals("123.00", quantity("123").addRD(price("0.00000001")).toString());
+        assertEquals("122.99", quantity("123").addRD(price("-0.00000001")).toString());
+        assertEquals("-122.99", quantity("-123").addRD(price("0.00000001")).toString());
+        assertEquals("-123.00", quantity("-123").addRD(price("-0.00000001")).toString());
 
         assertEquals("125.00000000", price("123").add(2).toString());
         assertEquals("121.00000000", price("123").add(-2).toString());
@@ -320,6 +340,9 @@ public class AbstractDecimalTest {
         assertEquals("0.00", quantity().minus(price("92233720368.54775807"), price("92233720368.54775807"), RoundingMode.UNNECESSARY).toString());
         assertEquals("0.00", quantity().minus(price("-92233720368.54775807"), price("-92233720368.54775807"), RoundingMode.UNNECESSARY).toString());
         assertEquals("-184467440737.10", quantity().minus(price("-92233720368.54775807"), price("92233720368.54775807"), RoundingMode.UP).toString());
+        // same, rounding DOWN
+        assertEquals("184467440737.09", quantity().minusRD(price("92233720368.54775807"), price("-92233720368.54775807")).toString());
+        assertEquals("-184467440737.09", quantity().minusRD(price("-92233720368.54775807"), price("92233720368.54775807")).toString());
 
         // Scaling overflows (can not be prevented)
         assertEquals("NaN", price().minus(quantity("92233720368547758.07"), quantity("-92233720368547758.07"), RoundingMode.UP).toString());
@@ -363,6 +386,11 @@ public class AbstractDecimalTest {
         assertEquals("123.00", quantity("123").subtract(price("0.00000001"), RoundingMode.UP).toString());
         assertEquals("-123.00", quantity("-123").subtract(price("-0.00000001"), RoundingMode.UP).toString());
         assertEquals("-123.01", quantity("-123").subtract(price("0.00000001"), RoundingMode.UP).toString());
+
+        assertEquals("123.00", quantity("123.").subtractRD(price("-0.00000001")).toString());
+        assertEquals("122.99", quantity("123").subtractRD(price("0.00000001")).toString());
+        assertEquals("-122.99", quantity("-123").subtractRD(price("-0.00000001")).toString());
+        assertEquals("-123.00", quantity("-123").subtractRD(price("0.00000001")).toString());
 
         assertEquals("125.00000000", price("123").subtract(-2).toString());
         assertEquals("121.00000000", price("123").subtract(2).toString());
@@ -418,6 +446,11 @@ public class AbstractDecimalTest {
         assertEquals("-1230.01", quantity.product(price("-123"), price("10.00000001"), RoundingMode.UP).toString());
         assertEquals("1230.01", quantity.product(price("-123"), price("-10.00000001"), RoundingMode.UP).toString());
 
+        assertEquals("1230.00", quantity.productRD(price("123"), price("10.00000001")).toString());
+        assertEquals("-1230.00", quantity.productRD(price("123"), price("-10.00000001")).toString());
+        assertEquals("-1230.00", quantity.productRD(price("-123"), price("10.00000001")).toString());
+        assertEquals("1230.00", quantity.productRD(price("-123"), price("-10.00000001")).toString());
+
         assertEquals("1230.00000000", price.product(123, 10).toString());
         assertEquals("-1230.00000000", price.product(123, -10).toString());
         assertEquals("-1230.00000000", price.product(-123, 10).toString());
@@ -450,8 +483,8 @@ public class AbstractDecimalTest {
         assertEquals("-1230.00", quantity("-123").mul(10).toString());
         assertEquals("1230.00", quantity("-123").mul(-10).toString());
 
-        assertEquals("NaN", price("NaN").mul(quantity("10"), RoundingMode.DOWN).toString());
-        assertEquals("NaN", price("123").mul(quantity("NaN"), RoundingMode.DOWN).toString());
+        assertEquals("NaN", price("NaN").mulRD(quantity("10")).toString());
+        assertEquals("NaN", price("123").mulRD(quantity("NaN")).toString());
 
         assertEquals("0.11", quantity("0.33").mul(quantity("0.33"), RoundingMode.UP).toString());
         assertEquals("0.10", quantity("0.33").mul(quantity("0.33"), RoundingMode.DOWN).toString());
@@ -469,9 +502,14 @@ public class AbstractDecimalTest {
         assertEquals("-123.00", quantity.quotient(-1230, 10, RoundingMode.UNNECESSARY).toString());
         assertEquals("123.00", quantity.quotient(-1230, -10, RoundingMode.UNNECESSARY).toString());
 
-        assertEquals("NaN", quantity.quotient(quantity("10000000000000000.00"), quantity("0.01"), RoundingMode.DOWN).toString());
-        assertEquals("NaN", quantity.quotient(quantity("NaN"), quantity("10"), RoundingMode.DOWN).toString());
-        assertEquals("NaN", quantity.quotient(quantity("1230"), quantity("NaN"), RoundingMode.DOWN).toString());
+        assertEquals("111.81", quantity.quotientRD(1230, 11).toString());
+        assertEquals("-111.81", quantity.quotientRD(1230, -11).toString());
+        assertEquals("-111.81", quantity.quotientRD(-1230, 11).toString());
+        assertEquals("111.81", quantity.quotientRD(-1230, -11).toString());
+
+        assertEquals("NaN", quantity.quotientRD(quantity("10000000000000000.00"), quantity("0.01")).toString());
+        assertEquals("NaN", quantity.quotientRD(quantity("NaN"), quantity("10")).toString());
+        assertEquals("NaN", quantity.quotientRD(quantity("1230"), quantity("NaN")).toString());
     }
 
     @Test
@@ -481,10 +519,20 @@ public class AbstractDecimalTest {
         assertEquals("-123.00", quantity("-1230").div(quantity("10"), RoundingMode.UNNECESSARY).toString());
         assertEquals("123.00", quantity("-1230").div(quantity("-10"), RoundingMode.UNNECESSARY).toString());
 
+        assertEquals("111.81", quantity("1230").divRD(quantity("11")).toString());
+        assertEquals("-111.81", quantity("1230").divRD(quantity("-11")).toString());
+        assertEquals("-111.81", quantity("-1230").divRD(quantity("11")).toString());
+        assertEquals("111.81", quantity("-1230").divRD(quantity("-11")).toString());
+
         assertEquals("123.00", quantity("1230").div(10, RoundingMode.UNNECESSARY).toString());
         assertEquals("-123.00", quantity("1230").div(-10, RoundingMode.UNNECESSARY).toString());
         assertEquals("-123.00", quantity("-1230").div(10, RoundingMode.UNNECESSARY).toString());
         assertEquals("123.00", quantity("-1230").div(-10, RoundingMode.UNNECESSARY).toString());
+
+        assertEquals("111.81", quantity("1230").divRD(11).toString());
+        assertEquals("-111.81", quantity("1230").divRD(-11).toString());
+        assertEquals("-111.81", quantity("-1230").divRD(11).toString());
+        assertEquals("111.81", quantity("-1230").divRD(-11).toString());
 
         assertEquals("NaN", quantity("10000000000000000.00").div(quantity("0.01"), RoundingMode.UNNECESSARY).toString());
         assertEquals("NaN", quantity("NaN").div(quantity("10"), RoundingMode.UNNECESSARY).toString());

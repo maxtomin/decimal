@@ -2,9 +2,33 @@ package org.maxtomin.decimal;
 
 import java.math.RoundingMode;
 
+/**
+ * This class contains a lot of "magic" and can be incomprehensible.
+ * If you need to understand it, the following information can help you.
+ * <p>
+ * The class is doing long multiplication and division for (mostly) positive numbers longer than 64-bit.
+ * It is required to do operations with numbers with up to 9 implied decimal points.
+ * "9" is the highest power of 10 still fitting signed 32-bit int, which simplifies (and speeds up) calculations a lot.
+ * <p>
+ * Main 2 methods of the class are "mulscale_63_31" and "scalediv_63_63".
+ * First multiplies 2 long numbers and scales down the result (i.e. divides by a power of 10)
+ * Second scales up a long number (i.e. multiplies by a power of 10) and then divide by another long.
+ * The trick here is not to overflow too soon.
+ * <p>
+ * Note the suffixes of methods and variables (e.g. hi_31), they shows maximum number of significant bits expected
+ * in this number. All values are unsigned, so foe example hi_31 and lo_32 are the high and lo words of the same long
+ * number, where sign bit is always zero in hi_31, because we only consider positive numbers. This is true for many variables,
+ * so usually odd number of bits means higher part and even number of bits means lower part, e.g. p_63 and p_32 represents
+ * a single 96-bit positive integer with high 2 words in p_63 and low word in p_32. "Word" means 31- or 32-bit unsigned integer.
+ * Suffix in a method name denotes the type of the method result. Some methods returns multiple primitive values, e.g.
+ * "mulhi_63_32", the second value is returned in accumulator field - {@link #a}. For example mulhi_63_32 method returns
+ * a 95-bit integer with higher 63 bit returned in the return value and lower 32 bit returned in {@link #a}.
+ * <p>
+ * Most of the variables has "long" type, even if they store only 31 or 32 bits.
+ * <p>
+ * See the methods JavaDocs for more details.
+ */
 abstract class BaseDecimal extends Number {
-    public static final String OVERFLOW_EXCEPTION = "Overflow";
-
     static final int[] POW10 = {
             1,
             10,
@@ -79,6 +103,9 @@ abstract class BaseDecimal extends Number {
 
     long a; // accumulator
 
+     /**
+     * Multiply 63-bit and 32-bit unsigned numbers, resulting in 63+32 bit integer.
+     */
     long mulhi_63_32(long a_63, long b_32) {
         long hi_31 = hi_32(a_63);
 
@@ -89,6 +116,11 @@ abstract class BaseDecimal extends Number {
         return rHi_63;
     }
 
+    /**
+     * A wrapper for scalediv_63_63 supporting negative numbers.
+     * Converts everything to positive number, then calculates the sign of the result.
+     * Also does rounding.
+     */
     long scaleDivRound(long v, int s, long d, RoundingMode roundingMode) {
         if (v == AbstractDecimal.NaN || d == AbstractDecimal.NaN || d == 0) {
             return AbstractDecimal.NaN;
@@ -100,7 +132,7 @@ abstract class BaseDecimal extends Number {
         v = negIf(v, sign1); // ~v - 1 if negative
         d = negIf(d, sign2);
 
-        long result = scalediv_63o_63(v, s, d);
+        long result = scalediv_63_63(v, s, d);
         if (result == AbstractDecimal.NaN) {
             return result;
         }
@@ -110,7 +142,17 @@ abstract class BaseDecimal extends Number {
         return round(negIf(result, sign1), negIf(a, sign1), d, roundingMode);
     }
 
-    long scalediv_63o_63(long v_63, int scale, long d_63) {
+    /**
+     * Multiply v by 10^scale, then divide by d, avoiding overflows.
+     * Idea of implementation of "v / d * 10^scale"
+     * - first, make v < d, doing simple "[v / d] * 10^scale" part
+     * - if d is int (31-bit), then it's simple Java division
+     * - otherwise, long-multiply "p = v * 10^scale", resulting in 3-word p
+     * - normalize p and d (shift both left until highest bit of d is set)
+     * - do approximate division (p >> 32) / (d >> 32)
+     * - correct (decrement) the quotient, no more than 2 corrections required due to normalization above
+     */
+    long scalediv_63_63(long v_63, int scale, long d_63) {
         long offset_63 = 0;
         if (v_63 >= d_63) {
             // v * m / d = (v / d * d + v % d) * m / d = v / d * m + v % d * m / d
@@ -191,11 +233,16 @@ abstract class BaseDecimal extends Number {
         a = remainder >> shift;
         offset_63 += qhat_32;
         if (offset_63 < 0) {
-            throw new ArithmeticException(OVERFLOW_EXCEPTION);
+            return AbstractDecimal.NaN; // overflow
         }
         return offset_63;
     }
 
+    /**
+     * A wrapper for mulscale_63_31 supporting negative numbers.
+     * Converts everything to positive number, then calculates the sign of the result.
+     * Also does rounding.
+     */
     long mulScaleRound(long a, long b, int scale, RoundingMode roundingMode) {
         if (a == AbstractDecimal.NaN || b == AbstractDecimal.NaN) {
             return AbstractDecimal.NaN;
@@ -207,7 +254,7 @@ abstract class BaseDecimal extends Number {
         a = negIf(a, sign1);
         b = negIf(b, sign2);
 
-        long result = mulscale_63o_31(a, b, scale);
+        long result = mulscale_63_31(a, b, scale);
         if (result == AbstractDecimal.NaN) {
             return result;
         }
@@ -217,7 +264,15 @@ abstract class BaseDecimal extends Number {
         return round(negIf(result, sign1), negIf(this.a, sign1), LONG_POW10[scale], roundingMode);
     }
 
-    long mulscale_63o_31(long a_63, long b_63, int scale) {
+    /**
+     * Multiply a and b and divide the result by 10^scale, avoiding overflows.
+     * Idea of implementation of "a * b / 10^scale"
+     * - first, long-multiply a and b (with 128-bit result)
+     * - if scale > 9 (can be up to 18), then divide by 10^10 first (slower, but not often needed)
+     * - 10^10 does not fit "int", but it can be shifted by 3 zero bits right to fit
+     * - as soon as scale is 9 or less, its simple long division by "int"
+     */
+    long mulscale_63_31(long a_63, long b_63, int scale) {
         // long multiplication
         long a_31 = hi_32(a_63);
         long a_32 = lo_32(a_63);
@@ -290,9 +345,11 @@ abstract class BaseDecimal extends Number {
         return (result_63o << WORD_BITS) | ql_32;
     }
 
+    /**
+     * switch + division by constant is faster than "v_63 / PO10[scale]"
+     * also good for signed numbers (remainder is negative for negative result)
+     */
     long downScale_63_31(long v_63, int scale) {
-        // switch + division by constant is faster than "v_63 / PO10[scale]"
-        // also good for signed numbers (remainder is negative for negative result)
         switch (scale) {
             case 0:
                 a = 0;
@@ -329,6 +386,9 @@ abstract class BaseDecimal extends Number {
         }
     }
 
+    /**
+     * same as {@link #downScale_63_31}, but support unsigned longs (by shifting numerator and denominator by 1)
+     */
     long unsignedDownScale_64_31(long v_64, int scale) {
         // supports unsigned values
         a = v_64 & 0x1;
@@ -368,7 +428,7 @@ abstract class BaseDecimal extends Number {
 
 
     /**
-     * Round common (and mixed) fractions.
+     * Round common (and mixed) fractions, represented as "whole + numerator / denominator".
      * Ca not take NaN, but can produce NaN (e.g. failed UNNECESSARY or rounding up +-MAX_VALUE)
      *
      * @param whole can be positive or negative
@@ -404,20 +464,32 @@ abstract class BaseDecimal extends Number {
         }
     }
 
+    /**
+     * Compare 2 96-bit numbers
+     */
     private static boolean greaterThan(long ah_63, long al_32, long bh_63, long bl_32) {
         return ah_63 > bh_63 || ah_63 == bh_63 && al_32 >= bl_32;
     }
 
+    /**
+     * Hi word of long
+     */
     private static long hi_32(long v_64) {
         return v_64 >>> WORD_BITS;
     }
 
+    /**
+     * Lo word of long
+     */
     private static long lo_32(long v_64) {
         return v_64 & WORD_LO_MASK;
     }
 
+    /**
+     * if sign == -1, then negate (return ~v + 1 == -v)
+     */
     static long negIf(long v, long sign) {
-        return (v ^ sign) - sign; // if sign == -1, then return ~v + 1 == -v
+        return (v ^ sign) - sign;
     }
 
     @Override

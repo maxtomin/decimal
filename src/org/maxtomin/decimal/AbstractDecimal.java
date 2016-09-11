@@ -8,6 +8,7 @@ import java.text.ParseException;
  * for a concrete class (instance of same class must always have the same scale). Multiple subclases with different dps
  * can be created, e.g. Quantity with 2 dp and Price with 8 dp.
  * Supports basic arithmetic operations with full control of overflow and rounding.
+ * Rounding must be explicitly provided if required with the exception of "RD" methods that round DOWN (fastest).
  * Non-allocating (unless explicitly specified).
  * <p>
  * Special value {@link #NaN} is used to represent an invalid operation, including<ul>
@@ -84,7 +85,55 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
-     * Adds 2 numbers of the same scale and puts result to this
+     * Copy the value from another decimal, rounding down if necessary
+     */
+    public T setRD(AbstractDecimal<?> a) {
+        return set(a, RoundingMode.DOWN);
+    }
+    
+    /**
+     * Copy the value from another decimal
+     * Rounding is required if the argument scale is greater than this scale.
+     */
+    public T set(AbstractDecimal<?> a, RoundingMode roundingMode) {
+        int scale = getScale() - a.getScale();
+        if (scale == 0) {
+            return setRaw(a.getRaw());
+        } else if (scale < 0 && !a.isNaN()) {
+            long result = downScale_63_31(a.getRaw(), -scale);
+            long remainder = getRaw();
+            return setRaw(round(result, remainder, POW10[-scale], roundingMode));
+        } else {
+            return setRaw(scaleWithOverflow(a.getRaw(), scale));
+        }
+    }
+
+    /**
+     * Copy the value from long (considering scale)
+     * No rounding required.
+     */
+    public T set(long a) {
+        return setRaw(scaleWithOverflow(a, getScale()));
+    }
+
+    /**
+     * Copy the value from another Decimal with the same scale.
+     * No rounding required.
+     */
+    public T set(T a) {
+        return set(a, RoundingMode.UNNECESSARY);
+    }
+
+    /**
+     * Add 2 numbers of the same scale and puts result to this
+     * Round DOWN if the arguments' scale is greater than this scale.
+     */
+    public <V extends AbstractDecimal> T plusRD(V a, V b) {
+        return plus(a, b, RoundingMode.DOWN);
+    }
+
+    /**
+     * Add 2 numbers of the same scale and puts result to this
      * Rounding is required if the arguments' scale is greater than this scale.
      */
     public <V extends AbstractDecimal> T plus(V a, V b, RoundingMode roundingMode) {
@@ -114,7 +163,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
-     * Adds 2 longs and puts result to this
+     * Add 2 longs and puts result to this
      * No rounding required
      */
     public T plus(long a, long b) {
@@ -130,7 +179,15 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
-     * Adds a number to this.
+     * Add a number to this.
+     * Round DOWN if the argument scale is greater than this scale.
+     */
+    public <V extends AbstractDecimal> T addRD(V a) {
+        return add(a, RoundingMode.DOWN);
+    }
+
+    /**
+     * Add a number to this.
      * Rounding is required if the argument scale is greater than this scale.
      */
     public <V extends AbstractDecimal> T add(V a, RoundingMode roundingMode) {
@@ -162,7 +219,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
-     * Adds a number of the same scale to this.
+     * Add a number of the same scale to this.
      * No rounding required.
      */
     public T add(T a) {
@@ -170,7 +227,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
-     * Adds a long number to this.
+     * Add a long number to this.
      * No rounding required.
      */
     public T add(long a) {
@@ -212,6 +269,14 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
     /**
      * Subtract 2 numbers of the same scale and puts result to this
+     * Round DOWN if the arguments' scale is greater than this scale.
+     */
+    public <V extends AbstractDecimal> T minusRD(V a, V b) {
+        return minus(a, b, RoundingMode.DOWN);
+    }
+
+    /**
+     * Subtract 2 numbers of the same scale and puts result to this
      * Rounding is required if the arguments' scale is greater than this scale.
      */
     public <V extends AbstractDecimal> T minus(V a, V b, RoundingMode roundingMode) {
@@ -222,11 +287,19 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
-     * Subtracts 2 longs and puts result to this
+     * Subtract 2 longs and puts result to this
      * No rounding required
      */
     public T minus(long a, long b) {
         return plus(a, -b);
+    }
+
+    /**
+     * Subtract a number from this.
+     * Round DOWN if the argument scale is greater than this scale.
+     */
+    public <V extends AbstractDecimal> T subtractRD(V a) {
+        return subtract(a, RoundingMode.DOWN);
     }
 
     /**
@@ -261,6 +334,14 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
     /**
      * Multiply 2 numbers of the same scale and put the result to this.
+     * Round DOWN if the arguments scale combined is greater than this scale.
+     */
+    public <V extends AbstractDecimal> T productRD(V a, V b) {
+        return product(a, b, RoundingMode.DOWN);
+    }
+
+    /**
+     * Multiply 2 numbers of the same scale and put the result to this.
      * Rounding is required if the arguments scale combined is greater than this scale.
      */
     public <V extends AbstractDecimal> T product(V a, V b, RoundingMode roundingMode) {
@@ -286,6 +367,14 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
     /**
      * Multiply this by the argument.
+     * Round DOWN if argument scale is not zero.
+     */
+    public <V extends AbstractDecimal> T mulRD(V a) {
+        return mul(a, RoundingMode.DOWN);
+    }
+
+    /**
+     * Multiply this by the argument.
      * Rounding is required if argument scale is not zero.
      */
     public <V extends AbstractDecimal> T mul(V a, RoundingMode roundingMode) {
@@ -302,6 +391,15 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
     /**
      * Divide first argument bye second and the result to this.
+     * Round DOWN.
+     * Return {@link #NaN} if b is zero.
+     */
+    public <V extends AbstractDecimal> T quotientRD(V a, V b) {
+        return quotient(a, b, RoundingMode.DOWN);
+    }
+
+    /**
+     * Divide first argument bye second and the result to this.
      * Rounding is always required.
      * Return {@link #NaN} if b is zero.
      */
@@ -310,6 +408,15 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
             throw new IllegalArgumentException("Scales must be the same");
         }
         return quotient(a.getRaw(), b.getRaw(), roundingMode);
+    }
+
+    /**
+     * Divide first argument bye second and the result to this.
+     * Round DOWN.
+     * Return {@link #NaN} if b is zero.
+     */
+    public T quotientRD(long a, long b) {
+        return quotient(a, b, RoundingMode.DOWN);
     }
 
     /**
@@ -323,11 +430,29 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
     /**
      * Divide this by the argument and put result into this.
+     * Round DOWN.
+     * Return {@link #NaN} if a is zero.
+     */
+    public <V extends AbstractDecimal> T divRD(V a) {
+        return div(a, RoundingMode.DOWN);
+    }
+
+    /**
+     * Divide this by the argument and put result into this.
      * Rounding is always required.
      * Return {@link #NaN} if a is zero.
      */
     public <V extends AbstractDecimal> T div(V a, RoundingMode roundingMode) {
         return setRaw(scaleDivRound(getRaw(), a.getScale(), a.getRaw(), roundingMode));
+    }
+
+    /**
+     * Divide this by the argument and put result into this.
+     * Round DOWN.
+     * Return {@link #NaN} if a is zero.
+     */
+    public T divRD(long a) {
+        return div(a, RoundingMode.DOWN);
     }
 
     /**
@@ -443,6 +568,13 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
+     * Returns the whole part of the value rounding DOWN, throws exception if {@link #NaN}
+     */
+    public long toLongRD() {
+        return toLong(RoundingMode.DOWN);
+    }
+
+    /**
      * Returns the whole part of the value, throws exception if {@link #NaN}
      */
     public long toLong(RoundingMode roundingMode) {
@@ -473,6 +605,13 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
      */
     public double toDouble() {
         return !isNaN() ? (double) getRaw() / POW10[getScale()] : Double.NaN;
+    }
+
+    /**
+     * Converts doublie to Decimal value rounding DOWN
+     */
+    public T fromDoubleRD(double value) {
+        return fromDouble(value, RoundingMode.DOWN);
     }
 
     /**
@@ -650,5 +789,4 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
             return mulScaleRound(a, b, 0, RoundingMode.DOWN);
         }
     }
-
 }
