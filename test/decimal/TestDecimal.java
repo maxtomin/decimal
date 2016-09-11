@@ -1,6 +1,6 @@
-package org.maxtomin.decimal;
+package decimal;
 
-public class TestDecimal extends AbstractDecimal<TestDecimal> {
+class TestDecimal extends AbstractDecimal<TestDecimal> {
     private final int scale;
 
     public TestDecimal(int scale) {

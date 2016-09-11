@@ -1,4 +1,4 @@
-package org.maxtomin.decimal.sample;
+package decimal.sample;
 
 import java.text.ParseException;
 

@@ -1,12 +1,35 @@
-package org.maxtomin.decimal;
+/*
+ MIT License
+
+ Copyright (c) 2016 Maxim Tomin
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+ */
+package decimal;
 
 import java.math.RoundingMode;
 
 /**
- * This class contains a lot of "magic" and can be incomprehensible.
- * If you need to understand it, the following information can help you.
+ * This class contains a lot of "magic" code and can be incomprehensible.
+ * If you have to understand it, the following information can help you.
  * <p>
- * The class is doing long multiplication and division for (mostly) positive numbers longer than 64-bit.
+ * The class is doing long multiplication and division for 96-bit and 128-bit (mostly) positive numbers.
  * It is required to do operations with numbers with up to 9 implied decimal points.
  * "9" is the highest power of 10 still fitting signed 32-bit int, which simplifies (and speeds up) calculations a lot.
  * <p>
@@ -16,15 +39,14 @@ import java.math.RoundingMode;
  * The trick here is not to overflow too soon.
  * <p>
  * Note the suffixes of methods and variables (e.g. hi_31), they shows maximum number of significant bits expected
- * in this number. All values are unsigned, so foe example hi_31 and lo_32 are the high and lo words of the same long
- * number, where sign bit is always zero in hi_31, because we only consider positive numbers. This is true for many variables,
+ * in this number. All values are unsigned, so for example hi_31 and lo_32 are the high and lo words of the same long
+ * number, where sign bit is always zero in hi_31, because we only consider only positive numbers. This is true for many variables,
  * so usually odd number of bits means higher part and even number of bits means lower part, e.g. p_63 and p_32 represents
- * a single 96-bit positive integer with high 2 words in p_63 and low word in p_32. "Word" means 31- or 32-bit unsigned integer.
- * Suffix in a method name denotes the type of the method result. Some methods returns multiple primitive values, e.g.
- * "mulhi_63_32", the second value is returned in accumulator field - {@link #a}. For example mulhi_63_32 method returns
- * a 95-bit integer with higher 63 bit returned in the return value and lower 32 bit returned in {@link #a}.
+ * a single 96-bit positive integer with high 2 words in p_63 and low word in p_32. "Word" means 32-bit unsigned integer.
+ * Suffix in a method name denotes the type of the result. Some methods returns values bigger than "long", e.g.
+ * "mulhi_63_32", returns 96-bit result, hi 63-bit in "return" and lo 32-bit in {@link #a}.
  * <p>
- * Most of the variables has "long" type, even if they store only 31 or 32 bits.
+ * Most of the variables has "long" type, even if they store only 31 or 32 bits (to int overflows).
  * <p>
  * See the methods JavaDocs for more details.
  */

@@ -1,6 +1,6 @@
-package org.maxtomin.decimal.sample;
+package decimal.sample;
 
-import org.maxtomin.decimal.AbstractDecimal;
+import decimal.AbstractDecimal;
 
 public class Decimal extends AbstractDecimal<Decimal> {
     @Override
