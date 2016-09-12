@@ -1,5 +1,7 @@
 package decimal.sample;
 
+import decimal.Decimal;
+
 import java.text.ParseException;
 
 public class Sample {
