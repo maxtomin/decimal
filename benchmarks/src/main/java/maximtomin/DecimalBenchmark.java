@@ -32,7 +32,7 @@
 package maximtomin;
 
 import decimal.sample.Price;
-import decimal.sample.Quantity2;
+import decimal.sample.Quantity;
 import org.openjdk.jmh.annotations.*;
 
 import java.math.BigDecimal;
@@ -58,7 +58,7 @@ public class DecimalBenchmark {
 
     @Benchmark
     public long control() {
-        return new Quantity2().setRaw(value1).getRaw() + new Price().setRaw(value2).getRaw();
+        return new Quantity().setRaw(value1).getRaw() + new Price().setRaw(value2).getRaw();
     }
 
     @Benchmark
@@ -73,12 +73,12 @@ public class DecimalBenchmark {
 
     @Benchmark
     public long multiplyDecimal() {
-        return new Quantity2().setRaw(value1).mulRD(new Price().setRaw(value2)).getRaw();
+        return new Quantity().setRaw(value1).mulRD(new Price().setRaw(value2)).getRaw();
     }
 
     @Benchmark
     public long quotientDecimal() {
-        return new Price().quotientRD(new Quantity2().setRaw(value1), new Quantity2().setRaw(value2)).getRaw();
+        return new Price().quotientRD(new Quantity().setRaw(value1), new Quantity().setRaw(value2)).getRaw();
     }
 
     @Benchmark
