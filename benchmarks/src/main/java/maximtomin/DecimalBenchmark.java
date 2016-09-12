@@ -36,9 +36,7 @@ import decimal.sample.Quantity;
 import org.openjdk.jmh.annotations.*;
 
 import java.math.BigDecimal;
-import java.math.MathContext;
 import java.math.RoundingMode;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 @BenchmarkMode(Mode.AverageTime)
@@ -51,6 +49,7 @@ public class DecimalBenchmark {
 
     @Setup(Level.Iteration)
     public void setup() {
+        // Fast linear congruential generator with parameters from Wiki
         seed = seed * 6364136223846793005L + 1442695040888963407L;
         value1 = seed;
         seed = seed * 6364136223846793005L + 1442695040888963407L;
