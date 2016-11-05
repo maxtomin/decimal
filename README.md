@@ -14,12 +14,12 @@ Faster than BigDecimal, just 2-4 times slower than native multiplication and div
 
 JMH benchmark:
 <pre>
-Benchmark                            Mode  Cnt    Score   Error  Units Comment
-DecimalBenchmark.control             avgt  200   10.321 ± 0.084  ns/op Initializing data only
-DecimalBenchmark.multiply            avgt  200   10.807 ± 0.095  ns/op Native 64-bit multiply
-DecimalBenchmark.multiplyDecimal     avgt  200   36.874 ± 0.125  ns/op Decimal multiply
-DecimalBenchmark.multiplyBigDecimal  avgt  200  130.980 ± 0.347  ns/op BigDecimal multiply 
-DecimalBenchmark.quotient            avgt  200   72.520 ± 0.259  ns/op Native 64-bit divide
-DecimalBenchmark.quotientDecimal     avgt  200  146.981 ± 7.289  ns/op Decimal divide
-DecimalBenchmark.quotientBigDecimal  avgt  200  185.196 ± 0.828  ns/op BigDecimal divide
+Benchmark                            Mode  Cnt    Score   Error  Units
+DecimalBenchmark.control             avgt  200   10.072 ± 0.074  ns/op
+DecimalBenchmark.multiply            avgt  200   10.625 ± 0.142  ns/op
+DecimalBenchmark.multiplyDecimal     avgt  200   35.840 ± 0.121  ns/op
+DecimalBenchmark.multiplyBigDecimal  avgt  200  126.098 ± 0.408  ns/op
+DecimalBenchmark.quotient            avgt  200   70.728 ± 0.230  ns/op
+DecimalBenchmark.quotientDecimal     avgt  200  138.581 ± 7.102  ns/op
+DecimalBenchmark.quotientBigDecimal  avgt  200  179.650 ± 0.849  ns/op
 </pre>

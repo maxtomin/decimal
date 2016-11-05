@@ -42,8 +42,8 @@ import java.text.ParseException;
  * Any operations involving {@link #NaN} return {@link #NaN}.
  * <p>
  * All operations can involve at most 2 different scales as arguments and result, they can be divided into:<ul>
- *     <li>Unary operations, taking a single argument and modifying this object, a.g. a.add(5)</li>
- *     <li>Binary operations, taking a 2 argument of the <b>same</b> scale and putting result to this object, a.g. a.plus(3, 4)</li>
+ *     <li>Unary operations, taking a single argument and modifying this object, e.g. a.add(5)</li>
+ *     <li>Binary operations, taking a 2 argument of the <b>same</b> scale and putting result to this object, e.g. a.plus(3, 4)</li>
  * </ul>
  * A long value can be used instead of a Decimal argument with 0 dp.
  * <p>
@@ -788,19 +788,12 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
     private static long addWithOverflow(long a, long b) {
         long result = a + b;
-        if (a == NaN || b == NaN || (result < 0) != (a < 0) && (result < 0) != (b < 0)) {
-            return NaN;
-        }
-        return result;
+        return a == NaN || b == NaN || (result < 0) != (a < 0) && (result < 0) != (b < 0) ? NaN : result;
     }
 
     private static long scaleWithOverflow(long value, int scale) {
-        if (value >= -SCALE_OVERFLOW_LIMITS[scale] && value <= SCALE_OVERFLOW_LIMITS[scale]) { // and not NaN
-            value = value * POW10[scale];
-            return value;
-        } else {
-            return NaN;
-        }
+         return value >= -SCALE_OVERFLOW_LIMITS[scale] && value <= SCALE_OVERFLOW_LIMITS[scale] ?
+                 value * POW10[scale] : NaN;
     }
 
     private long mulWithOverflow(long a, long b) {
