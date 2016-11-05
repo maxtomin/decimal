@@ -149,6 +149,8 @@ public class BaseDecimalTest {
         assertEquals(NaN, decimal.scaleDivRound(NaN, 1, -3, RoundingMode.UP));
         assertEquals(NaN, decimal.scaleDivRound(1, 1, NaN, RoundingMode.UP));
         assertEquals(NaN, decimal.scaleDivRound(NaN, 1, NaN, RoundingMode.UP));
+
+        assertEquals(NaN, decimal.scaleDivRound(Long.MAX_VALUE, 9, 1, RoundingMode.UP)); // overflow
     }
 
     @Test
@@ -179,6 +181,8 @@ public class BaseDecimalTest {
         assertEquals(NaN, decimal.mulScaleRound(NaN, -123, 1, RoundingMode.UP));
         assertEquals(NaN, decimal.mulScaleRound(1, NaN, 1, RoundingMode.UP));
         assertEquals(NaN, decimal.mulScaleRound(NaN, NaN, 1, RoundingMode.UP));
+
+        assertEquals(NaN, decimal.mulScaleRound(Long.MAX_VALUE, Long.MAX_VALUE, 1, RoundingMode.UP)); // overflow
     }
 
     @Test
@@ -231,6 +235,41 @@ public class BaseDecimalTest {
         testMulScale(9223372032559808512L, 9223372036854775807L, 18);
         testMulScale(9223372032559808512L, 9223372036854775807L, 18);
         testMulScale(9223372036854775807L, 8446744073709551615L, 18);
+    }
+
+
+    @Test
+    public void testDownScale() throws Exception {
+        testDownScale(9223372036854775807L, 0);
+        testDownScale(922337203685477580L, 1);
+        testDownScale(92233720368547758L, 2);
+        testDownScale(9223372036854775L, 3);
+        testDownScale(922337203685477L, 4);
+        testDownScale(92233720368547L, 5);
+        testDownScale(9223372036854L, 6);
+        testDownScale(922337203685L, 7);
+        testDownScale(92233720368L, 8);
+        testDownScale(9223372036L, 9);
+    }
+
+    private void testDownScale(long value, int scale) {
+        if (scale == 0) {
+            assertThat(decimal.downScale_63_31(value, scale), is(value));
+            assertThat(decimal.a, is(0L));
+
+            value *= 2;
+            assertThat(decimal.unsignedDownScale_64_31(value, scale), is(value));
+            assertThat(decimal.a, is(0L));
+        } else {
+            long product = value * (long) Math.pow(10, scale) + 1;
+            assertThat(decimal.downScale_63_31(product, scale), is(value));
+            assertThat(decimal.a, is(1L));
+
+            value *= 2;
+            product = value * (long) Math.pow(10, scale) + 1;
+            assertThat(decimal.unsignedDownScale_64_31(product, scale), is(value));
+            assertThat(decimal.a, is(1L));
+        }
     }
 
     @Test

@@ -448,8 +448,13 @@ abstract class BaseDecimal extends Number {
         a = v_64 & 0x1;
         v_64 >>>= 1;
         switch (scale) {
+            case 0:
+                v_64 <<= 1; // revert what we just did
+                v_64 += a;
+                a = 0;
+                return v_64;
             case 1:
-                a = (v_64 % 5);
+                a |= (v_64 % 5);
                 return v_64 / 5;
             case 2:
                 a |= (v_64 % 50) << 1;
