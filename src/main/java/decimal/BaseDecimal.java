@@ -220,21 +220,53 @@ abstract class BaseDecimal extends Number {
         long qhat_32 = p_63 / d_31; // approximate division (high parts)
         qhat_32 = lo_32(qhat_32); // exact quotient can not be bigger than Integer.MAX_VALUE
 
+        /*
+         We can prove that a) we need max 1 correction down (decreasing quotient) and b) we don't need corrections up.
+         We are essentially approximating division
+         (p_63 * W + p_32) / (d_31 * W + d_32), with division
+         p_63 / d_31, where
+         p_63, p_32, d_31, d_32 - natural numbers, W = 2^32 and
+         0 <= p_32 < W, 0 <= d_32 < W - lower words of the values
+         p_63 < d_31 - due to the very first "if"
+         d_31 >= 2^32 - due to normalization
+         p_63 / d_31 <= 10^9 - this is why we need 1 correction, not 2, unlike the standard algorithm (from Google)
+
+         Proof a):
+         Let's estimate difference between approximated and exact division:
+         p_63 / d_31 - (p_63 * W + p_32) / (d_31 * W + d_32) < p_63 / d_31 - (p_63 * W) / (d_31 * W + d_32) =
+         = p_63 / d_31 - p_63 / (d_31 + d_32 / W) = p_63 / d_31 - p_63 / d_31 * 1 / (1 + d_32 / (W * d_31))) <
+         < p_63 / d_31 * (1 - 1 / (1 + 2^32 / (2^32 * 2^30))) <= 10^9 * (1 - 1 / (1 + 2^-30)) < 1
+
+         Do the difference is < 1, therefore difference of whole parts is <= 1, because if A - B < 1 then:
+         [A] - [B] = A - {A} - B + {B} < 1 - {A} + {B} <= 1 + {B} < 2, therefore
+         [A] - [B] <= 1 (it's a whole number)
+
+         Proof b):
+         Now we need to proof that [estimated quotient] is not bigger than [exact quotient]:
+         [(p_63 * W + p_32) / (d_31 * W + d_32)] <=
+         (p_63 * W + p_32) / (d_31 * W + d_32) <= (p_63 * W + p_32) / (d_31 * W) =
+          p_63 / d_31 + p_32 / (d_31 * W) =
+          [p_63 / d_31] + {p_63 / d_31} + {p_32 / (d_31 * W)} =
+          [p_63 / d_31] + {p_63 / d_31 + p_32 / (d_31 * W)}
+
+          The last "=" is true, because
+          p_63 / d_31 + p_32 / (d_31 * W) = (p_63 + p_32 / W) / d_31 < (p_63 + 1) / W <= 1  (whole numbers p_63 < W)
+
+          Therefore:
+          [(p_63 * W + p_32) / (d_31 * W + d_32)] <= [p_63 / d_31]  (fractional component can be ignored)
+
+          Finally we have got:
+          0 <= [p_63 / d_31] - [(p_63 * W + p_32) / (d_31 * W + d_32)] <= 1
+          or
+          0 <= qhat - q <= 1
+         */
+
         // multiply back
         long phat_63 = mulhi_63_32(d_63, qhat_32);
         long phat_32 = a;
 
-        // our divisor is between 2^62 and 2^63 - 1 after normalization
-        // we decreased dividend by max 2^32 - 1
-        // so quotient is decreased by max 2^32 / 2^62 < 1
-
-        // we decreased divisor by max 2^32 - 1 or by max fraction 2^32 / 2^62
-        // so quotient is increased by max fraction 2^32 / 2^62 or by max absolute 2^32 / 2^62 * 2^31 = 2^63 / 2^62 = 2
-
-        // phat must be < p, applying corrections (no more than 2)
-        int counter = 0;
-        while (greaterThan(phat_63, phat_32, p_63, p_32)) {
-            assert ++counter <= 2;
+        // phat must be <= p, if not, applying correction down (no more than 1)
+        if (greaterThan(phat_63, phat_32, p_63, p_32)) {
             --qhat_32;
 
             // delta -= d
@@ -245,18 +277,18 @@ abstract class BaseDecimal extends Number {
                 phat_32 += WORD_CARRY;
             }
         }
-        long remainder = ((p_63 - phat_63) << WORD_BITS) + p_32 - phat_32; // remainder
-        if (remainder >= d_63 || remainder < 0) { // unsigned compare
-            remainder -= d_63;
-            qhat_32++;
-        }
-        assert remainder >= 0 && remainder < d_63 : "no more than 1 correction up";
+        assert !greaterThan(phat_63, phat_32, p_63, p_32) : "one down correction must be enough";
 
+        long remainder = ((p_63 - phat_63) << WORD_BITS) + p_32 - phat_32; // remainder
+        assert remainder >= 0 && remainder < d_63 : "no up corrections necessary";
+
+        // original quantity and remainder
         a = remainder >> shift;
         offset_63 += qhat_32;
-        if (offset_63 < 0) {
-            return AbstractDecimal.NaN; // overflow
-        }
+
+        assert d_63 > POW10[scale] : "Because d_63 > Integer.MAX_VALUE";
+        assert offset_63 >= 0 : "No overflow: final quantity = v * 10^scale / d < v <= Long.MAX_VALUE";
+
         return offset_63;
     }
 
@@ -490,7 +522,7 @@ abstract class BaseDecimal extends Number {
      * Compare 2 96-bit numbers
      */
     private static boolean greaterThan(long ah_63, long al_32, long bh_63, long bl_32) {
-        return ah_63 > bh_63 || ah_63 == bh_63 && al_32 >= bl_32;
+        return ah_63 > bh_63 || ah_63 == bh_63 && al_32 > bl_32;
     }
 
     /**

@@ -92,6 +92,22 @@ public class BaseDecimalTest {
         testScaleDiv(449033535071450778L, 9, 659820219978L);
         testScaleDiv(0x400000000000L, 4, Long.MAX_VALUE);
         testScaleDiv(4026532095L, 4, 67553994662215680L);
+
+        testScaleDiv(9223372036854775807L, 0, 1);
+        testScaleDiv(922337203685477580L, 1, 1);
+        testScaleDiv(9223372036L, 9, 1);
+
+        testScaleDiv(2147483646, 0, 2147483647);
+        testScaleDiv(2147483646, 9, 2147483647);
+        testScaleDiv(9223372036854775807L, 9, 2147483647);
+        testScaleDiv(9223372036854775807L, 9, 1073741824);
+
+        // overflow when adding "o * 10^scale + v 10^scale / d"
+        testScaleDiv(9223372027776627962L, 9, 999999999);
+        testScaleDiv(8301034833169298228L, 1, 9);
+
+        assertEquals(0x40000000ffffffffL, 4611686022722355199L);
+        testScaleDiv(4611686022722355198L, 9, 4611686022722355199L); // (probably) worst case for down-correction
     }
 
     @Test
@@ -273,6 +289,28 @@ public class BaseDecimalTest {
     }
 
     private void testScaleDiv(long v, int s, long d) {
+        testScaleDiv1(v, s, d);
+        if (v < Long.MAX_VALUE) {
+            testScaleDiv1(v + 1, s, d);
+        }
+        if (v > 0) {
+            testScaleDiv1(v - 1, s, d);
+        }
+        if (s < 9) {
+            testScaleDiv1(v, s + 1, d);
+        }
+        if (s > 0) {
+            testScaleDiv1(v, s - 1, d);
+        }
+        if (d < Long.MAX_VALUE) {
+            testScaleDiv1(v, s, d + 1);
+        }
+        if (d > 1) {
+            testScaleDiv1(v, s, d - 1);
+        }
+    }
+
+    private void testScaleDiv1(long v, int s, long d) {
         try {
             BigInteger[] dAndR = BigInteger.valueOf(v).multiply(BigInteger.TEN.pow(s)).divideAndRemainder(BigInteger.valueOf(d));
 
