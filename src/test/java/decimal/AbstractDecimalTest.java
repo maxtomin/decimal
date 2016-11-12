@@ -68,6 +68,13 @@ public class AbstractDecimalTest {
         assertEquals("-123.00", quantity.set(-123).toString());
         assertEquals("NaN", quantity.set(Long.MAX_VALUE).toString());
         assertEquals("NaN", quantity.set(-Long.MAX_VALUE).toString());
+
+        assertEquals("123.00000000", price.set(price.fromDoubleRD(123.0)).toString());
+        assertEquals("123.00000000", price.set(quantity.fromDoubleRD(123.0)).toString());
+        assertEquals("92233720368547758.00", quantity.fromLong(92233720368547758L).toString());
+        assertEquals("NaN", price.set(quantity).toString());
+        assertEquals("-92233720368547758.00", quantity.fromLong(-92233720368547758L).toString());
+        assertEquals("NaN", price.set(quantity).toString());
     }
 
     @Test
@@ -88,6 +95,13 @@ public class AbstractDecimalTest {
         assertEquals("0.0", new TestDecimal(1).setRaw(0).toString());
         assertEquals("0.00", new TestDecimal(2).setRaw(0).toString());
         assertEquals("1.00", new TestDecimal(2).setRaw(100).toString());
+
+        assertEquals("NaN", new TestDecimal(2).setRaw(AbstractDecimal.NaN).toString());
+
+        StringBuilder sb = new StringBuilder();
+        assertEquals("0.0123", new TestDecimal(4).setRaw(123).toStringBuilder(sb).toString());
+        assertEquals("0.01230.0123", new TestDecimal(4).setRaw(123).toStringBuilder(sb).toString());
+        assertEquals("0.01230.01230.0123", new TestDecimal(4).setRaw(123).toStringBuilder(sb).toString());
     }
 
     @Test
@@ -126,9 +140,22 @@ public class AbstractDecimalTest {
         assertExceptionWhileParsing("-92233720368547758100000000");
         assertExceptionWhileParsing("1.23.34");
         assertExceptionWhileParsing("rubbish");
+        assertExceptionWhileParsing("");
+        assertExceptionWhileParsing("none");
+        assertExceptionWhileParsing("1.");
 
         try {
             new TestDecimal(1).parse("9223372036854775807");
+            fail("Exception expected");
+        } catch (ParseException e) {
+        }
+        try {
+            new TestDecimal(1).parse("1", 1, 0);
+            fail("Exception expected");
+        } catch (ParseException e) {
+        }
+        try {
+            new TestDecimal(1).parse("-1", 0, 1);
             fail("Exception expected");
         } catch (ParseException e) {
         }
@@ -166,6 +193,14 @@ public class AbstractDecimalTest {
         assertEquals("-1", new TestDecimal(0).fromDouble(-1.5, RoundingMode.DOWN).toString());
         assertEquals("1", new TestDecimal(0).fromDouble(1.7, RoundingMode.DOWN).toString());
         assertEquals("-1", new TestDecimal(0).fromDouble(-1.7, RoundingMode.DOWN).toString());
+
+        assertEquals("0", new TestDecimal(0).fromDouble(0.0, RoundingMode.UP).toString());
+        assertEquals("1", new TestDecimal(0).fromDouble(0.5, RoundingMode.UP).toString());
+        assertEquals("-1", new TestDecimal(0).fromDouble(-0.5, RoundingMode.UP).toString());
+        assertEquals("2", new TestDecimal(0).fromDouble(1.5, RoundingMode.UP).toString());
+        assertEquals("-2", new TestDecimal(0).fromDouble(-1.5, RoundingMode.UP).toString());
+        assertEquals("2", new TestDecimal(0).fromDouble(1.7, RoundingMode.UP).toString());
+        assertEquals("-2", new TestDecimal(0).fromDouble(-1.7, RoundingMode.UP).toString());
 
         assertEquals("0", new TestDecimal(0).fromDouble(0.0, RoundingMode.FLOOR).toString());
         assertEquals("0", new TestDecimal(0).fromDouble(0.5, RoundingMode.FLOOR).toString());
@@ -225,6 +260,28 @@ public class AbstractDecimalTest {
         assertTrue(new TestDecimal(9).parse("NaN").compareTo(new TestDecimal(0).parse("-1000000000000000000")) < 0);
         assertTrue(new TestDecimal(9).parse("-1000000000").compareTo(new TestDecimal(0).parse("NaN")) > 0);
         assertTrue(new TestDecimal(9).parse("NaN").compareTo(new TestDecimal(0).parse("NaN")) == 0);
+
+        assertTrue(new TestDecimal(0).parse("9223372036854775807").compareTo(new TestDecimal(0).parse("9223372036854775807")) == 0);
+        assertTrue(new TestDecimal(0).parse("9223372036854775807").compareTo(new TestDecimal(0).parse("-9223372036854775807")) > 0);
+        assertTrue(new TestDecimal(0).parse("-9223372036854775807").compareTo(new TestDecimal(0).parse("9223372036854775807")) < 0);
+        assertTrue(new TestDecimal(0).parse("-9223372036854775807").compareTo(new TestDecimal(0).parse("-9223372036854775807")) == 0);
+
+        assertTrue(new TestDecimal(0).parse("9223372036854775806").compareTo(new TestDecimal(1).parse("922337203685477580.0")) > 0);
+        assertTrue(new TestDecimal(0).parse("922337203685477580").compareTo(new TestDecimal(1).parse("922337203685477580.0")) == 0);
+        assertTrue(new TestDecimal(0).parse("922337203685477579").compareTo(new TestDecimal(1).parse("922337203685477580.0")) < 0);
+
+        assertTrue(new TestDecimal(1).parse("922337203685477580.0").compareTo(new TestDecimal(0).parse("9223372036854775806")) < 0);
+        assertTrue(new TestDecimal(1).parse("922337203685477580.0").compareTo(new TestDecimal(0).parse("922337203685477580")) == 0);
+        assertTrue(new TestDecimal(1).parse("922337203685477580.0").compareTo(new TestDecimal(0).parse("922337203685477579")) > 0);
+
+        assertTrue(new TestDecimal(0).parse("-9223372036854775806").compareTo(new TestDecimal(1).parse("-922337203685477580.0")) < 0);
+        assertTrue(new TestDecimal(0).parse("-922337203685477580").compareTo(new TestDecimal(1).parse("-922337203685477580.0")) == 0);
+        assertTrue(new TestDecimal(0).parse("-922337203685477579").compareTo(new TestDecimal(1).parse("-922337203685477580.0")) > 0);
+
+        assertTrue(new TestDecimal(1).parse("-922337203685477580.0").compareTo(new TestDecimal(0).parse("-9223372036854775806")) > 0);
+        assertTrue(new TestDecimal(1).parse("-922337203685477580.0").compareTo(new TestDecimal(0).parse("-922337203685477580")) == 0);
+        assertTrue(new TestDecimal(1).parse("-922337203685477580.0").compareTo(new TestDecimal(0).parse("-922337203685477579")) < 0);
+
     }
 
     @Test
@@ -405,12 +462,12 @@ public class AbstractDecimalTest {
         assertEquals("-121.00", quantity("-123").subtract(price("-2"), RoundingMode.UNNECESSARY).toString());
         assertEquals("-125.00", quantity("-123").subtract(price("2"), RoundingMode.UNNECESSARY).toString());
 
-        assertEquals("123.01", quantity("123.").subtract(price("-0.00000001"), RoundingMode.UP).toString());
+        assertEquals("123.01", quantity("123").subtract(price("-0.00000001"), RoundingMode.UP).toString());
         assertEquals("123.00", quantity("123").subtract(price("0.00000001"), RoundingMode.UP).toString());
         assertEquals("-123.00", quantity("-123").subtract(price("-0.00000001"), RoundingMode.UP).toString());
         assertEquals("-123.01", quantity("-123").subtract(price("0.00000001"), RoundingMode.UP).toString());
 
-        assertEquals("123.00", quantity("123.").subtractRD(price("-0.00000001")).toString());
+        assertEquals("123.00", quantity("123").subtractRD(price("-0.00000001")).toString());
         assertEquals("122.99", quantity("123").subtractRD(price("0.00000001")).toString());
         assertEquals("-122.99", quantity("-123").subtractRD(price("-0.00000001")).toString());
         assertEquals("-123.00", quantity("-123").subtractRD(price("0.00000001")).toString());

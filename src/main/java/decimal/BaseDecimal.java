@@ -116,7 +116,8 @@ abstract class BaseDecimal extends Number {
             "0000000000000000".toCharArray(),
             "00000000000000000".toCharArray(),
             "000000000000000000".toCharArray(),
-            "0000000000000000000".toCharArray()
+            "0000000000000000000".toCharArray(),
+            "00000000000000000000".toCharArray()
     };
 
     static final int WORD_BITS = 32;

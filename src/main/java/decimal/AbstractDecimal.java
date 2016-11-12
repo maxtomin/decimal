@@ -47,6 +47,7 @@ import java.text.ParseException;
  * </ul>
  * A long value can be used instead of a Decimal argument with 0 dp.
  * <p>
+ * Note: this class has a natural ordering that is inconsistent with equals, see {@link #compareTo}
  *
  * @param <T>
  */
@@ -512,6 +513,9 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     /**
      * Compares 2 values considering the scale ("0.123" < "12.0" although its not true for raw values)
      * {@link #NaN} is smaller than any other number irrespective of scale. Two {@link #NaN}s are equal to each other.
+     *
+     * Comparison can work across different concrete classes, and therefore can be inconsistent with {@link #equals},
+     * which always returns "false" for different classes.
      */
     @Override
     public int compareTo(AbstractDecimal o) {
@@ -521,25 +525,18 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
             return isNaN() ? 0 : 1;
         }
 
-        long saved = getRaw();
-
         int scale = getScale() - o.getScale();
-        int result;
         if (scale >= 0) {
-            long first = downScale_63_31(getRaw(), scale);
-            result = first > o.getRaw() ? 1 :
-                    first < o.getRaw() ? -1 :
-                            (int) getRaw(); // remainder matters
-        } else {
             long first = getRaw();
-            long second = downScale_63_31(o.getRaw(), -scale);
-            result = first > second ? 1 :
-                    first < second ? -1 :
-                            (int) -getRaw(); // remainder matters
+            long second = scaleWithOverflow(o.getRaw(), scale);
+            return first < second || second == NaN && o.getRaw() > 0 ? -1 :
+                    first > second ? 1 : 0;
+        } else {
+            long first = scaleWithOverflow(getRaw(), -scale);
+            long second = o.getRaw();
+            return first > second || first == NaN && getRaw() > 0 ? 1 :
+                    first < second ? -1 : 0;
         }
-
-        setRaw(saved);
-        return result;
     }
 
     /**
@@ -650,6 +647,8 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
         switch (roundingMode) {
             case DOWN:
                 return setIntDouble(value);
+            case UP:
+                return setIntDouble(value > 0 ? Math.ceil(value) : Math.floor(value));
             case FLOOR:
                 return setIntDouble(Math.floor(value));
             case CEILING:
@@ -696,15 +695,10 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
         }
         sb.append(raw);
 
+        assert sb.length() > scale : "sb.length() >= length + scale - length + 1 = scale + 1 > scale";
+
         if (scale > 0) {
-            sb.append('.');
-            for (int index = sb.length() - 2; index > 0; index--) {
-                sb.setCharAt(index + 1, sb.charAt(index));
-                if (--scale == 0) {
-                    sb.setCharAt(index, '.');
-                    return sb;
-                }
-            }
+            sb.insert(sb.length() - scale, '.');
         }
 
         return sb;
@@ -715,43 +709,49 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
      * Unlike other methods, does NOT use NaN to indicate an error, uses ParseException instead.
      */
     public T parse(CharSequence charSequence) throws ParseException {
-        int length = charSequence.length();
+        return parse(charSequence, 0, charSequence.length());
+    }
+
+    public T parse(CharSequence charSequence, int offset, int length) throws ParseException {
         if (length == 0) {
             throw new ParseException("Empty string", 0);
         }
 
-        int index = 0;
         boolean negative = false;
-        char ch = charSequence.charAt(0);
+        char ch = charSequence.charAt(offset);
         switch (ch) {
             case '-':
                 if (length == 1) {
                     throw new ParseException("Single '-' is not expected", 0);
                 }
                 negative = true;
-                index++;
+                offset++;
                 break;
             case 'N':
             case 'n':
                 if (length != 3 ||
-                        charSequence.charAt(1) != 'a' && charSequence.charAt(1) != 'A' ||
-                        charSequence.charAt(2) != 'n' && charSequence.charAt(2) != 'N')
+                        charSequence.charAt(offset + 1) != 'a' && charSequence.charAt(offset + 1) != 'A' ||
+                        charSequence.charAt(offset + 2) != 'n' && charSequence.charAt(offset + 2) != 'N') {
                     throw new ParseException("Unexpected alphanumeric value", 0);
+                }
                 return setRaw(NaN);
             default:
                 // go on
         }
 
         long result = 0;
-        int dotPos = length;
-        while (index < length) {
-            ch = charSequence.charAt(index++);
+        int fractionalStart = length;
+        while (offset < length) {
+            ch = charSequence.charAt(offset++);
             if (ch == '.') {
-                if (dotPos != length) {
-                    throw new ParseException("Double '.' found", index);
+                if (fractionalStart != length) {
+                    throw new ParseException("Double '.' found", offset);
                 }
-                dotPos = index;
-                while (length > dotPos && charSequence.charAt(length - 1) == '0') {
+                if (offset == length) {
+                    throw new ParseException("Last '.' found", offset);
+                }
+                fractionalStart = offset; // dot position incremented
+                while (length > fractionalStart && charSequence.charAt(length - 1) == '0') {
                     length--;
                 }
             } else if (ch >= '0' && ch <= '9') {
@@ -764,11 +764,11 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
                     throw new ParseException("Overflow", 0);
                 }
             } else {
-                throw new ParseException("Unexpected " + ch, index);
+                throw new ParseException("Unexpected " + ch, offset - 1);
             }
         }
 
-        result = scaleWithOverflow(result, getScale() - (length - dotPos));
+        result = scaleWithOverflow(result, getScale() - (length - fractionalStart));
         if (result == NaN) {
             throw new ParseException("Overflow while scaling up", 0);
         }
