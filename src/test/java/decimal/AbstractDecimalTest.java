@@ -286,10 +286,10 @@ public class AbstractDecimalTest {
 
     @Test
     public void testPlus() throws Exception {
-        assertEquals("125.00", quantity().plus(quantity("123"), quantity("2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("121.00", quantity().plus(quantity("123"), quantity("-2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-121.00", quantity().plus(quantity("-123"), quantity("2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-125.00", quantity().plus(quantity("-123"), quantity("-2"), RoundingMode.UNNECESSARY).toString());
+        assertEquals("125.00", quantity().plus(quantity("123"), quantity("2")).toString());
+        assertEquals("121.00", quantity().plus(quantity("123"), quantity("-2")).toString());
+        assertEquals("-121.00", quantity().plus(quantity("-123"), quantity("2")).toString());
+        assertEquals("-125.00", quantity().plus(quantity("-123"), quantity("-2")).toString());
 
         assertEquals("125.00000000", price().plus(quantity("123"), quantity("2"), RoundingMode.UNNECESSARY).toString());
         assertEquals("121.00000000", price().plus(quantity("123"), quantity("-2"), RoundingMode.UNNECESSARY).toString());
@@ -338,10 +338,10 @@ public class AbstractDecimalTest {
 
     @Test
     public void testAdd() throws Exception {
-        assertEquals("125.00", quantity("123").add(quantity("2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("121.00", quantity("123").add(quantity("-2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-121.00", quantity("-123").add(quantity("2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-125.00", quantity("-123").add(quantity("-2"), RoundingMode.UNNECESSARY).toString());
+        assertEquals("125.00", quantity("123").add(quantity("2")).toString());
+        assertEquals("121.00", quantity("123").add(quantity("-2")).toString());
+        assertEquals("-121.00", quantity("-123").add(quantity("2")).toString());
+        assertEquals("-125.00", quantity("-123").add(quantity("-2")).toString());
 
         assertEquals("125.00000000", price("123").add(quantity("2"), RoundingMode.UNNECESSARY).toString());
         assertEquals("121.00000000", price("123").add(quantity("-2"), RoundingMode.UNNECESSARY).toString());
@@ -395,10 +395,10 @@ public class AbstractDecimalTest {
 
     @Test
     public void testMinus() throws Exception {
-        assertEquals("125.00", quantity().minus(quantity("123"), quantity("-2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("121.00", quantity().minus(quantity("123"), quantity("2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-121.00", quantity().minus(quantity("-123"), quantity("-2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-125.00", quantity().minus(quantity("-123"), quantity("2"), RoundingMode.UNNECESSARY).toString());
+        assertEquals("125.00", quantity().minus(quantity("123"), quantity("-2")).toString());
+        assertEquals("121.00", quantity().minus(quantity("123"), quantity("2")).toString());
+        assertEquals("-121.00", quantity().minus(quantity("-123"), quantity("-2")).toString());
+        assertEquals("-125.00", quantity().minus(quantity("-123"), quantity("2")).toString());
 
         assertEquals("125.00000000", price().minus(quantity("123"), quantity("-2"), RoundingMode.UNNECESSARY).toString());
         assertEquals("121.00000000", price().minus(quantity("123"), quantity("2"), RoundingMode.UNNECESSARY).toString());
@@ -447,10 +447,10 @@ public class AbstractDecimalTest {
 
     @Test
     public void testSubtract() throws Exception {
-        assertEquals("125.00", quantity("123").subtract(quantity("-2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("121.00", quantity("123").subtract(quantity("2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-121.00", quantity("-123").subtract(quantity("-2"), RoundingMode.UNNECESSARY).toString());
-        assertEquals("-125.00", quantity("-123").subtract(quantity("2"), RoundingMode.UNNECESSARY).toString());
+        assertEquals("125.00", quantity("123").subtract(quantity("-2")).toString());
+        assertEquals("121.00", quantity("123").subtract(quantity("2")).toString());
+        assertEquals("-121.00", quantity("-123").subtract(quantity("-2")).toString());
+        assertEquals("-125.00", quantity("-123").subtract(quantity("2")).toString());
 
         assertEquals("125.00000000", price("123").subtract(quantity("-2"), RoundingMode.UNNECESSARY).toString());
         assertEquals("121.00000000", price("123").subtract(quantity("2"), RoundingMode.UNNECESSARY).toString());

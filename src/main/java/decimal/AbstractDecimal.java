@@ -157,6 +157,18 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
+     * Add 2 numbers of the scale same to this
+     * No rounding required.
+     */
+    public T plus(T a, T b) {
+        if (getScale() != a.getScale() || getScale() != b.getScale()) {
+            throw new IllegalArgumentException("Scales must be the same");
+        }
+
+        return setRaw(plusWithOverflow(a.getRaw(), b.getRaw()));
+    }
+
+    /**
      * Add 2 numbers of the same scale and puts result to this
      * Rounding is required if the arguments' scale is greater than this scale.
      */
@@ -166,24 +178,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
         }
 
         int scale = getScale() - a.getScale();
-        if (scale < 0 && !a.isNaN() && !b.isNaN()) {
-            // no overflow is possible
-            long result = a.getRaw();
-            long remainder = b.getRaw();
-            if (result >= 0 && remainder >= 0) { // unsigned overflow is not possible, ok with signed one
-                result = unsignedDownScale_64_31(result + remainder, -scale);
-                remainder = getRaw();
-            } else if (result < 0 && remainder < 0) { // same as above, but negate everything before and after
-                result = -unsignedDownScale_64_31(-result - remainder, -scale);
-                remainder = -getRaw();
-            } else { // no overflow is possible
-                result = downScale_63_31(result + remainder, -scale);
-                remainder = getRaw();
-            }
-            return setRaw(round(result, remainder, POW10[-scale], roundingMode));
-        }
-
-        return plus(a.getRaw(), b.getRaw(), scale);
+        return plus(a.getRaw(), b.getRaw(), roundingMode, scale);
     }
 
     /**
@@ -191,15 +186,28 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
      * No rounding required
      */
     public T plus(long a, long b) {
-        return plus(a, b, getScale());
+        return setRaw(plusAndScale(a, b, getScale()));
     }
 
-    private T plus(long a, long b, int scale) {
-        long result = addWithOverflow(a, b);
-        if (scale > 0) {
-            result = scaleWithOverflow(result, scale);
+    /**
+     * Adds 2 longs and multiply the result by (possibly negative) power of 10
+     */
+    private T plus(long a, long b, RoundingMode roundingMode, int scale) {
+        if (scale >= 0 || a == NaN || b == NaN) {
+            return setRaw(plusAndScale(a, b, scale));
         }
-        return setRaw(result);
+
+        if (a >= 0 && b >= 0) { // unsigned overflow is not possible, ok with signed one
+            a = unsignedDownScale_64_31(a + b, -scale);
+            b = getRaw();
+        } else if (a < 0 && b < 0) { // same as above, but negate everything before and after
+            a = -unsignedDownScale_64_31(-a - b, -scale);
+            b = -getRaw();
+        } else { // no overflow is possible
+            a = downScale_63_31(a + b, -scale);
+            b = getRaw();
+        }
+        return setRaw(round(a, b, POW10[-scale], roundingMode));
     }
 
     /**
@@ -216,12 +224,36 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
      */
     public <V extends AbstractDecimal> T add(V a, RoundingMode roundingMode) {
         int scale = getScale() - a.getScale();
-        if (scale < 0 && !isNaN() && !a.isNaN()) {
+        return add(a.getRaw(), roundingMode, scale);
+    }
+
+    /**
+     * Add a number of the same scale to this.
+     * No rounding required.
+     */
+    @SuppressWarnings("unchecked")
+    public T add(T a) {
+        return plus((T) this, a);
+    }
+
+    /**
+     * Add a long number to this.
+     * No rounding required.
+     */
+    public T add(long a) {
+        return setRaw(scaleAndPlus(a, getScale(), getRaw()));
+    }
+
+    /**
+     * Adds a value multiplied by (possibly negative)  power of 10
+     */
+    private T add(long a, RoundingMode roundingMode, int scale) {
+        if (scale < 0 && !isNaN() && a != NaN) {
             long self = getRaw();
-            long other = downScale_63_31(a.getRaw(), -scale);
+            long other = downScale_63_31(a, -scale);
             long remainder = getRaw();
 
-            // have to inline addWithOverflow here to avoid extra if
+            // have to inline plusWithOverflow here to avoid extra "if NaN then return immediately"
             long result = self + other;
             if (self == NaN || other == NaN || (result < 0) != (self < 0) && (result < 0) != (other < 0)) {
                 return setRaw(NaN);
@@ -239,56 +271,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
             return setRaw(round(result, remainder, denominator, roundingMode));
         }
 
-        return add(a.getRaw(), scale);
-    }
-
-    /**
-     * Add a number of the same scale to this.
-     * No rounding required.
-     */
-    public T add(T a) {
-        return plus(this, a, RoundingMode.DOWN);
-    }
-
-    /**
-     * Add a long number to this.
-     * No rounding required.
-     */
-    public T add(long a) {
-        return add(a, getScale());
-    }
-
-    private T add(long a, int scale) {
-        long raw = getRaw();
-        if (scale > 0) {
-            long scaled = scaleWithOverflow(a, scale);
-            if (scaled == NaN && a != NaN && raw != NaN) {
-                // trying to eliminate overflow (possible when a and raw has different signs and abs(raw) is big enough)
-
-                // another bigger limit for unsigned multiplication (if we are out of this as well - give up)
-                long unsignedLimit = SCALE_OVERFLOW_LIMITS[scale] * 2;
-                if (raw < 0 && a > 0 && a <= unsignedLimit) {
-                    a = a * POW10[scale];
-                    assert a < 0 : "Overflow to sign expected";
-                    a += raw; // subtracting abs(raw)
-                    if (a >= 0) {
-                        // no more overflow
-                        return setRaw(a);
-                    }
-                } else if (raw > 0 && a >= -unsignedLimit && a < 0) {
-                    a = -a * POW10[scale]; // negate a before multiplying
-                    assert a < 0 : "Overflow to sign expected";
-                    a -= raw; // adding raw (in negated terms)
-                    if (a >= 0) {
-                        // no more overflow
-                        return setRaw(-a); // don't forget to negate "a" back
-                    }
-                }
-            }
-            a = scaled;
-        }
-
-        return setRaw(addWithOverflow(raw, a));
+        return setRaw(scaleAndPlus(a, scale, getRaw()));
     }
 
     /**
@@ -300,14 +283,28 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
+     * Subtract 2 numbers of the scale same to this
+     * No rounding required.
+     */
+    public T minus(T a, T b) {
+        if (a.getScale() != b.getScale()) {
+            throw new IllegalArgumentException("Scales must be the same");
+        }
+
+        return setRaw(plusWithOverflow(a.getRaw(), -b.getRaw()));
+    }
+
+    /**
      * Subtract 2 numbers of the same scale and puts result to this
      * Rounding is required if the arguments' scale is greater than this scale.
      */
     public <V extends AbstractDecimal> T minus(V a, V b, RoundingMode roundingMode) {
-        b.negate();
-        plus(a, b, roundingMode);
-        b.negate();
-        return self();
+        if (getScale() != a.getScale() || getScale() != b.getScale()) {
+            throw new IllegalArgumentException("Scales must be the same");
+        }
+
+        int scale = getScale() - a.getScale();
+        return plus(a.getRaw(), -b.getRaw(), roundingMode, scale);
     }
 
     /**
@@ -331,21 +328,17 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
      * Rounding is required if the argument scale is greater than this scale.
      */
     public <V extends AbstractDecimal> T subtract(V a, RoundingMode roundingMode) {
-        a.negate();
-        add(a, roundingMode);
-        a.negate();
-        return self();
+        int scale = getScale() - a.getScale();
+        return add(-a.getRaw(), roundingMode, scale);
     }
 
     /**
      * Subtract a number of the same scale from this.
      * No rounding required.
      */
+    @SuppressWarnings("unchecked")
     public T subtract(T a) {
-        a.negate();
-        plus(this, a, RoundingMode.DOWN);
-        a.negate();
-        return self();
+        return minus((T) this, a);
     }
 
     /**
@@ -786,7 +779,51 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
         return 19;
     }
 
-    private static long addWithOverflow(long a, long b) {
+    /**
+     * Adds 2 longs and multiply the result by non-negative power of 10
+     */
+    private static long plusAndScale(long a, long b, int nonNegScale) {
+        return scaleWithOverflow(plusWithOverflow(a, b), nonNegScale);
+    }
+
+    /**
+     * Multiply a value to a non-negative power of 10, then add it to another value, i.e.
+     * a * 10^scale + b
+     * Tries to eliminate multiplication overflow in case of different sign addends
+     */
+    private static long scaleAndPlus(long a, int nonNegScale, long b) {
+        if (nonNegScale > 0) {
+            long scaled = scaleWithOverflow(a, nonNegScale);
+            if (scaled == NaN && a != NaN && b != NaN) {
+                // trying to eliminate overflow (possible when a and raw has different signs and abs(raw) is big enough)
+
+                // another bigger limit for unsigned multiplication (if we are out of this as well - give up)
+                long unsignedLimit = SCALE_OVERFLOW_LIMITS[nonNegScale] * 2;
+                if (b < 0 && a > 0 && a <= unsignedLimit) {
+                    a = a * POW10[nonNegScale];
+                    assert a < 0 : "Overflow to sign expected";
+                    a += b; // subtracting abs(raw)
+                    if (a >= 0) {
+                        // no more overflow
+                        return a;
+                    }
+                } else if (b > 0 && a >= -unsignedLimit && a < 0) {
+                    a = -a * POW10[nonNegScale]; // negate a before multiplying
+                    assert a < 0 : "Overflow to sign expected";
+                    a -= b; // adding raw (in negated terms)
+                    if (a >= 0) {
+                        // no more overflow
+                        return -a; // don't forget to negate "a" back
+                    }
+                }
+            }
+            a = scaled;
+        }
+
+        return plusWithOverflow(b, a);
+    }
+
+    private static long plusWithOverflow(long a, long b) {
         long result = a + b;
         return a == NaN || b == NaN || (result < 0) != (a < 0) && (result < 0) != (b < 0) ? NaN : result;
     }
