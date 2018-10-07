@@ -23,3 +23,7 @@ DecimalBenchmark.quotient            avgt  200   70.728 ± 0.230  ns/op
 DecimalBenchmark.quotientDecimal     avgt  200  138.581 ± 7.102  ns/op
 DecimalBenchmark.quotientBigDecimal  avgt  200  179.650 ± 0.849  ns/op
 </pre>
+
+## License
+
+[The MIT License](https://opensource.org/licenses/MIT)
