@@ -299,7 +299,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
      * Rounding is required if the arguments' scale is greater than this scale.
      */
     public <V extends AbstractDecimal> T minus(V a, V b, RoundingMode roundingMode) {
-        if (getScale() != a.getScale() || getScale() != b.getScale()) {
+        if (a.getScale() != b.getScale()) {
             throw new IllegalArgumentException("Scales must be the same");
         }
 
