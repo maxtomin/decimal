@@ -287,7 +287,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
      * No rounding required.
      */
     public T minus(T a, T b) {
-        if (a.getScale() != b.getScale()) {
+        if (getScale() != a.getScale() || getScale() != b.getScale()) {
             throw new IllegalArgumentException("Scales must be the same");
         }
 
