@@ -95,6 +95,15 @@ abstract class BaseDecimal extends Number {
             Long.MAX_VALUE / 10000000,
             Long.MAX_VALUE / 100000000,
             Long.MAX_VALUE / 1000000000,
+            Long.MAX_VALUE / 10000000000L,
+            Long.MAX_VALUE / 100000000000L,
+            Long.MAX_VALUE / 1000000000000L,
+            Long.MAX_VALUE / 10000000000000L,
+            Long.MAX_VALUE / 100000000000000L,
+            Long.MAX_VALUE / 1000000000000000L,
+            Long.MAX_VALUE / 10000000000000000L,
+            Long.MAX_VALUE / 100000000000000000L,
+            Long.MAX_VALUE / 1000000000000000000L
     };
     static final char[][] ZEROES = {
             "".toCharArray(),

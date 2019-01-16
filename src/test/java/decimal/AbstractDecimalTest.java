@@ -168,6 +168,33 @@ public class AbstractDecimalTest {
         assertEquals("NaN", new TestDecimal(1).fromLong(1000000000000000000L).toString());
         assertEquals("NaN", new TestDecimal(0).fromLong(Long.MIN_VALUE).toString());
 
+        assertEquals("123.0", new TestDecimal(1).fromLong(1230, 1, RoundingMode.DOWN).toString());
+        assertEquals("123.0", new TestDecimal(1).fromLong(123, 0, RoundingMode.DOWN).toString());
+        assertEquals("120.0", new TestDecimal(1).fromLong(12, -1, RoundingMode.DOWN).toString());
+        assertEquals("100.0", new TestDecimal(1).fromLong(1, -2, RoundingMode.DOWN).toString());
+
+        assertEquals("123.4", new TestDecimal(1).fromLong(12341, 2, RoundingMode.DOWN).toString());
+        assertEquals("123.4", new TestDecimal(1).fromLong(123411, 3, RoundingMode.DOWN).toString());
+        assertEquals("123.5", new TestDecimal(1).fromLong(12341, 2, RoundingMode.UP).toString());
+        assertEquals("123.5", new TestDecimal(1).fromLong(123411, 3, RoundingMode.UP).toString());
+        assertEquals("-123.5", new TestDecimal(1).fromLong(-12341, 2, RoundingMode.UP).toString());
+        assertEquals("-123.5", new TestDecimal(1).fromLong(-123411, 3, RoundingMode.UP).toString());
+
+        // huge positive scales
+        assertEquals("9223372036.9", new TestDecimal(1).fromLong(Long.MAX_VALUE, 9, RoundingMode.UP).toString());
+        assertEquals("922337203.7", new TestDecimal(1).fromLong(Long.MAX_VALUE, 10, RoundingMode.UP).toString());
+        assertEquals("9.3", new TestDecimal(1).fromLong(Long.MAX_VALUE, 18, RoundingMode.UP).toString());
+        assertEquals("1.0", new TestDecimal(1).fromLong(Long.MAX_VALUE, 19, RoundingMode.UP).toString());
+        assertEquals("0.1", new TestDecimal(1).fromLong(Long.MAX_VALUE, 20, RoundingMode.UP).toString());
+        assertEquals("0.1", new TestDecimal(1).fromLong(Long.MAX_VALUE, 21, RoundingMode.UP).toString());
+
+        // huge negative scales
+        assertEquals("1000000000.0", new TestDecimal(1).fromLongRD(1, -9).toString());
+        assertEquals("10000000000.0", new TestDecimal(1).fromLongRD(1, -10).toString());
+        assertEquals("100000000000000000.0", new TestDecimal(1).fromLongRD(1, -17).toString());
+        assertEquals("NaN", new TestDecimal(1).fromLongRD(1, -18).toString());
+        assertEquals("NaN", new TestDecimal(1).fromLongRD(1, -19).toString());
+
         assertEquals(123L, new TestDecimal(1).setRaw(1230).toLong(RoundingMode.UNNECESSARY));
         assertEquals(123L, new TestDecimal(1).setRaw(1235).toLongRD());
         assertEquals(124L, new TestDecimal(1).setRaw(1235).toLong(RoundingMode.UP));

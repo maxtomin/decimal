@@ -614,6 +614,52 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
     }
 
     /**
+     * Converts scaled long to Decimal value. Can result in {@link #NaN} (if overflow)
+     * The result will be equal to value * 10^scale
+     *
+     * In particular, if scale == {@link #getScale} then {@link #setRaw}(value)
+     *
+     * @param value mantissa
+     * @param scale decimal exponent
+     * @param roundingMode required if scale is greater than {@link #getScale}
+     */
+    public T fromLong(long value, int scale, RoundingMode roundingMode) {
+        if (scale < -18) {
+            return setRaw(value == 0 ? 0 : NaN);
+        }
+        if (getScale() - scale < -18) {
+            // rounded zero
+            return setRaw(round(0, Long.signum(value), Long.MAX_VALUE, roundingMode));
+        }
+
+        scale = getScale() - scale; // no overflow guaranteed
+        if (scale >= 0) {
+            return setRaw(scale > 18 ? NaN : scaleWithOverflow(value, scale));
+        } else {
+            scale = -scale;
+            assert scale <= 18;
+            long remainder = 0;
+            long divisor = LONG_POW10[scale];
+            if (scale > 9) {
+                // double division by constant
+                // the formula for final remainder derived from:
+                // v / d1 / d2 = (q1 + r1 / d1) / d2 = q1 / d2 + r1 / d1d2 = q2 + r2 / d2 + r1 / d1d2 = q2 + (r2d1 + r1) / d1d2
+                value = downScale_63_31(value, 9);
+                remainder = a * 1000000000;
+                scale -= 9;
+            }
+            value = downScale_63_31(value, scale);
+            remainder += a;
+
+            return setRaw(round(value, remainder, divisor, roundingMode));
+        }
+    }
+
+    public T fromLongRD(long value, int scale) {
+        return fromLong(value, scale, RoundingMode.DOWN);
+    }
+
+    /**
      * Converts Decimal to floating-point number, returns {@link Double#NaN} if {@link #NaN}
      */
     public double toDouble() {
@@ -830,7 +876,7 @@ public abstract class AbstractDecimal<T extends AbstractDecimal> extends BaseDec
 
     private static long scaleWithOverflow(long value, int scale) {
          return value >= -SCALE_OVERFLOW_LIMITS[scale] && value <= SCALE_OVERFLOW_LIMITS[scale] ?
-                 value * POW10[scale] : NaN;
+                 value * LONG_POW10[scale] : NaN;
     }
 
     private long mulWithOverflow(long a, long b) {
